@@ -64,9 +64,11 @@ jobs:
           name: deploy
           command: 'echo placeholder'
 workflows:
-  build-and-deployRPM:
+  build-and-deploy-RPM:
     jobs:
-      - build
+      - build:
+          context:
+            - aws-constants
       - deploy:
           requires:
             - build
