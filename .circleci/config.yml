@@ -64,7 +64,7 @@ jobs:
           name: deploy
           command: 'echo placeholder'
 workflows:
-  build-and-test:
+  build-and-deployRPM:
     jobs:
       - build
       - deploy:
