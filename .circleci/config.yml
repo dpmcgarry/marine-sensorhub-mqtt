@@ -86,6 +86,7 @@ jobs:
   deploy:
     docker:
       - image: cimg/base:current-22.04
+    resource_class: dizon/onprem
     steps:
       # Replace this with steps to deploy to users
       - run:
