@@ -25,7 +25,10 @@ go.work.sum
 .env
 
 # Compiled binary
-mqtt-keepalive
+/mqtt-keepalive
 
 # log file
-mqtt-keepalive.log
+/mqtt-keepalive.log
+
+# deb file
+control

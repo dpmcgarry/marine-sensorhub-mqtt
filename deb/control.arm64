@@ -1,0 +1,5 @@
+Package: mqtt-keepalive
+Version: %VER%
+Maintainer: Don McGarry
+Architecture: arm64
+Description: Sends MQTT Messages as a keepalive

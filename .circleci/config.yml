@@ -55,14 +55,46 @@ jobs:
       - run:
           name: Print Package Version
           command: echo ${PACKAGE_BASE_VERSION}${CIRCLE_BUILD_NUM}
+      - run:
+          name: Build amd64 deb package
+          command: |
+            sed -e "s/%VER%/${PACKAGE_BASE_VERSION}${CIRCLE_BUILD_NUM}/g" ~/project/deb/control.amd64 | tee ~/project/deb/mqtt-keepalive/DEBIAN/control
+            cat ~/project/deb/mqtt-keepalive/DEBIAN/control
+            cp ~/build/amd64/mqtt-keepalive ~/project/deb/mqtt-keepalive/usr/local/bin/mqtt-keepalive
+            cd ~/project/deb
+            rm ./mqtt-keepalive/DEBIAN/.gitkeep
+            rm ./usr/local/bin/.gitkeep
+            dpkg-deb --build mqtt-keepalive
+            ls
+            cp mqtt-keepalive.deb ~/artifacts/mqtt-keepalive_${PACKAGE_BASE_VERSION}${CIRCLE_BUILD_NUM}_amd64.deb
+      - run:
+          name: Build arm64 deb package
+          command: |
+            sed -e "s/%VER%/${PACKAGE_BASE_VERSION}${CIRCLE_BUILD_NUM}/g" ~/project/deb/control.arm64 | tee ~/project/deb/mqtt-keepalive/DEBIAN/control
+            cat ~/project/deb/mqtt-keepalive/DEBIAN/control
+            cp ~/build/arm64/mqtt-keepalive ~/project/deb/mqtt-keepalive/usr/local/bin/mqtt-keepalive
+            cd ~/project/deb
+            dpkg-deb --build mqtt-keepalive
+            ls
+            cp mqtt-keepalive.deb ~/artifacts/route53-ddns_${PACKAGE_BASE_VERSION}${CIRCLE_BUILD_NUM}_arm64.deb
+      - run:
+          name: List Artifacts
+          command: ls -l -R ~/artifacts
+      - run:
+          Name: Upload Artifacts to S3
+          command: aws s3 cp ~/artifacts/ s3://${ARTIFACT_BUCKET}/deb/ --recursive      
   deploy:
     docker:
       - image: cimg/base:current-22.04
     steps:
       # Replace this with steps to deploy to users
       - run:
-          name: deploy
-          command: 'echo placeholder'
+          name: Update APT via SSH
+          command: |
+            mkdir -p ~/.ssh
+            touch ~/.ssh/known_hosts
+            ssh-keyscan -H $SSH_HOST >> ~/.ssh/known_hosts
+            ssh $SSH_USER@$SSH_HOST "sudo /opt/repo-sync.sh"
 workflows:
   build-and-deploy-RPM:
     jobs:
@@ -70,5 +102,7 @@ workflows:
           context:
             - aws-constants
       - deploy:
+          context:
+            - apt-repo
           requires:
             - build
