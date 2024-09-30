@@ -63,7 +63,7 @@ jobs:
             cp ~/build/amd64/mqtt-keepalive ~/project/deb/mqtt-keepalive/usr/local/bin/mqtt-keepalive
             cd ~/project/deb
             rm ./mqtt-keepalive/DEBIAN/.gitkeep
-            rm ./usr/local/bin/.gitkeep
+            rm ./mqtt-keepalive/usr/local/bin/.gitkeep
             dpkg-deb --build mqtt-keepalive
             ls
             cp mqtt-keepalive.deb ~/artifacts/mqtt-keepalive_${PACKAGE_BASE_VERSION}${CIRCLE_BUILD_NUM}_amd64.deb
