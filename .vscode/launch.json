@@ -10,7 +10,7 @@
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}",
-            "args": ["pub"]
+            "args": ["pub", "-i", "10"]
         }
     ]
 }

@@ -19,6 +19,7 @@ package main
 import "github.com/dpmcgarry/mqtt-keepalive/cmd"
 
 func main() {
+	configureViper()
 	configureLogging()
 	cmd.Execute()
 }

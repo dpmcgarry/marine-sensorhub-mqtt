@@ -17,21 +17,61 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package cmd
 
 import (
-	"fmt"
+	"os"
+	"time"
 
+	"github.com/dpmcgarry/mqtt-keepalive/internal"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
-// pubCmd represents the pub command
+var isDaemon bool
+var numIter uint
+
 var pubCmd = &cobra.Command{
 	Use:   "pub",
 	Short: "Publishes Keepalive Messages",
 	Long:  `Publishes Keepalive Messages.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("pub called")
+		log.Info().Msg("Starting Publish")
+		log.Info().Msg("Loading Global Config")
+		globalConf, err := internal.LoadGlobalConfig()
+		if err != nil {
+			log.Fatal().Msgf("Error reading Global config. Not much I can do except give up. %v", err.Error())
+			os.Exit(2)
+		}
+		log.Info().Msg("Loading Server Config")
+		serverConfs, err := internal.LoadServerConfig()
+		if err != nil {
+			log.Fatal().Msgf("Error reading Server config. Not much I can do except give up. %v", err.Error())
+			os.Exit(2)
+		}
+		if isDaemon {
+			log.Info().Msg("Running in daemon mode")
+			for {
+				for _, serverConf := range serverConfs {
+					internal.PublishMessage(globalConf, serverConf)
+				}
+				log.Debug().Msgf("Sleeping for %v seconds", globalConf.Interval)
+				time.Sleep(time.Duration(globalConf.Interval) * time.Second)
+			}
+		} else {
+			log.Info().Msgf("Will only run for %v iterations", numIter)
+			for i := 0; i < int(numIter); i++ {
+				for _, serverConf := range serverConfs {
+					internal.PublishMessage(globalConf, serverConf)
+				}
+				log.Debug().Msgf("Sleeping for %v seconds", globalConf.Interval)
+				time.Sleep(time.Duration(globalConf.Interval) * time.Second)
+			}
+		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(pubCmd)
+	pubCmd.Flags().BoolVarP(&isDaemon, "daemon", "d", false, "Set to run as a continuous daemon")
+	pubCmd.Flags().UintVarP(&numIter, "iter", "i", 0, "Number of Iterations to run before exiting")
+	pubCmd.MarkFlagsOneRequired("daemon", "iter")
+	pubCmd.MarkFlagsMutuallyExclusive("daemon", "iter")
 }

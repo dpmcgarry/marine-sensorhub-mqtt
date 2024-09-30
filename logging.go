@@ -55,7 +55,6 @@ func configureLogging() *Logger {
 	writers = append(writers, newRollingFile())
 	mw := io.MultiWriter(writers...)
 
-	// zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	logger := zerolog.New(mw).With().Timestamp().Logger()
 	// Adds the ability to change the logging level using an environment variable
 	level := strings.ToUpper(os.Getenv("LOGLEVEL"))
@@ -95,7 +94,7 @@ func configureLogging() *Logger {
 			Timestamp().
 			Caller().
 			Logger()
-	default: // Default to info level
+	default: // Default to Debug level
 		log.Logger = zerolog.New(mw).
 			Level(zerolog.DebugLevel).
 			With().

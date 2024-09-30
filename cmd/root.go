@@ -17,14 +17,12 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package cmd
 
 import (
-	"fmt"
 	"os"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
-
-var cfgFile string
 
 var rootCmd = &cobra.Command{
 	Use:   "mqtt-keepalive",
@@ -44,34 +42,8 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(initConfig)
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.mqtt-keepalive.yaml)")
 }
 
-// initConfig reads in config file and ENV variables if set.
 func initConfig() {
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-		viper.SetConfigName("mqtt-keepalive.conf")
-		viper.SetConfigType("yaml")
-		viper.AddConfigPath("/etc/")
-		viper.AddConfigPath(".")
-		viper.SetDefault("logdir", "./")
-		viper.SetDefault("interval", 15)
-		if err := viper.ReadInConfig(); err != nil {
-			if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-				fmt.Printf("Config File not found in /etc or current dir: %v\n", err)
-				os.Exit(1)
-			} else {
-				fmt.Printf("Error reading config file but file was found: %v\n", err)
-				os.Exit(1)
-			}
-		}
-	}
-
-	viper.AutomaticEnv()
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
-	}
+	log.Info().Msgf("Using config file: %v", viper.ConfigFileUsed())
 }

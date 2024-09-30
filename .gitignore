@@ -29,6 +29,3 @@ mqtt-keepalive
 
 # log file
 mqtt-keepalive.log
-
-# config file
-mqtt-keepalive.conf
