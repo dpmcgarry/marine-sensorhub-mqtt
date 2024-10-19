@@ -17,6 +17,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package internal
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
@@ -29,6 +31,30 @@ func PublishMessage(globalconf GlobalConfig, serverConf MQTTDestination) {
 	log.Debug().Msgf("Will publish to %v", serverConf.Host)
 	mqttOpts := MQTT.NewClientOptions()
 	mqttOpts.AddBroker(serverConf.Host)
+	if serverConf.Username != "" {
+		mqttOpts.SetUsername(serverConf.Username)
+		log.Debug().Msgf("Using Username: %v", serverConf.Username)
+	}
+	if serverConf.Password != "" {
+		mqttOpts.SetPassword(serverConf.Password)
+		log.Trace().Msgf("Using Password: %v", serverConf.Password)
+	}
+	if len(serverConf.CACert) > 0 {
+		log.Debug().Msg("Constructing x509 Cert Pool")
+		rootCAs, err := x509.SystemCertPool()
+		if err != nil || rootCAs == nil {
+			log.Warn().Msg("Unable to get system cert pool")
+			rootCAs = x509.NewCertPool()
+		}
+		if ok := rootCAs.AppendCertsFromPEM(serverConf.CACert); !ok {
+			log.Warn().Msg("No certs appended, using system certs only")
+		}
+
+		tlsConfig := &tls.Config{
+			RootCAs: rootCAs,
+		}
+		mqttOpts.SetTLSConfig(tlsConfig)
+	}
 	client := MQTT.NewClient(mqttOpts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		log.Warn().Msgf("Error Connecting to host: %v", token.Error())

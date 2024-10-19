@@ -19,14 +19,18 @@ package internal
 import (
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 )
 
 type MQTTDestination struct {
-	Host   string
-	Topics []string
+	Host     string
+	Topics   []string
+	Username string
+	Password string
+	CACert   []byte
 }
 
 type GlobalConfig struct {
@@ -49,7 +53,7 @@ func LoadServerConfig() ([]MQTTDestination, error) {
 		return nil, errors.New("server configuration formatting invalid")
 	}
 
-	for k, _ := range serverConf {
+	for k := range serverConf {
 		dest := MQTTDestination{}
 		log.Debug().Msgf("Server: %v", k)
 		dest.Host = k
@@ -61,6 +65,28 @@ func LoadServerConfig() ([]MQTTDestination, error) {
 		for _, topic := range topics {
 			log.Debug().Msgf("Topic %v", topic)
 			dest.Topics = append(dest.Topics, topic)
+		}
+
+		if viper.IsSet("servers." + k + ".username") {
+			dest.Username = viper.GetString("servers." + k + ".username")
+			log.Debug().Msgf("Username %v", dest.Username)
+		}
+
+		if viper.IsSet("servers." + k + ".password") {
+			dest.Password = viper.GetString("servers." + k + ".password")
+			log.Trace().Msgf("Password %v", dest.Password)
+		}
+
+		if viper.IsSet("servers." + k + ".cafile") {
+			cafilename := viper.GetString("servers." + k + ".cafile")
+			log.Debug().Msgf("Using CA File %v", cafilename)
+			cabytes, err := os.ReadFile(cafilename)
+			if err != nil {
+				log.Error().Msgf("Error Reading Defined CA File: %v", err.Error())
+				return nil, fmt.Errorf("unable to read CA file %v", err)
+			}
+			log.Debug().Msgf("Loaded CAFile %v", cafilename)
+			dest.CACert = cabytes
 		}
 		destinations = append(destinations, dest)
 	}
