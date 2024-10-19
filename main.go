@@ -16,7 +16,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 package main
 
-import "github.com/dpmcgarry/mqtt-keepalive/cmd"
+import "github.com/dpmcgarry/marine-sensorhub-mqtt/cmd"
 
 func main() {
 	configureViper()

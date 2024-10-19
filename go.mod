@@ -1,4 +1,4 @@
-module github.com/dpmcgarry/mqtt-keepalive
+module github.com/dpmcgarry/marine-sensorhub-mqtt
 
 go 1.23.1
 

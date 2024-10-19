@@ -25,7 +25,7 @@ import (
 
 // Need a separate function to configure viper before logging is configured
 func configureViper() {
-	viper.SetConfigName("mqtt-keepalive.conf")
+	viper.SetConfigName("marine-sensorhub-mqtt.conf")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("/etc/")
 	viper.AddConfigPath(".")

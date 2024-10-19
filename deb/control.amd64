@@ -1,5 +1,5 @@
-Package: mqtt-keepalive
+Package: marine-sensorhub-mqtt
 Version: %VER%
 Maintainer: Don McGarry
 Architecture: amd64
-Description: Sends MQTT Messages as a keepalive
+Description: Go Daemon to process MQTT messages from Marine Sensorhub

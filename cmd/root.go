@@ -25,7 +25,7 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "mqtt-keepalive",
+	Use:   "marine-sensorhub-mqtt",
 	Short: "Sends MQTT Messages as a keepalive",
 	Long: `Certain MQTT servers such as the Victron Cerbo and SignalK
 require an empty MQTT message sent to a specific topic to keep the

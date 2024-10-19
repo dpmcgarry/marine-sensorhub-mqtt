@@ -20,7 +20,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/dpmcgarry/mqtt-keepalive/internal"
+	"github.com/dpmcgarry/marine-sensorhub-mqtt/internal"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )

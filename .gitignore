@@ -25,10 +25,10 @@ go.work.sum
 .env
 
 # Compiled binary
-/mqtt-keepalive
+/marine-sensorhub-mqtt
 
 # log file
-/mqtt-keepalive.log
+/marine-sensorhub-mqtt.log
 
 # deb file
 control

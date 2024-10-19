@@ -58,25 +58,25 @@ jobs:
       - run:
           name: Build amd64 deb package
           command: |
-            sed -e "s/%VER%/${PACKAGE_BASE_VERSION}${CIRCLE_BUILD_NUM}/g" ~/project/deb/control.amd64 | tee ~/project/deb/mqtt-keepalive/DEBIAN/control
-            cat ~/project/deb/mqtt-keepalive/DEBIAN/control
-            cp ~/build/amd64/mqtt-keepalive ~/project/deb/mqtt-keepalive/usr/local/bin/mqtt-keepalive
+            sed -e "s/%VER%/${PACKAGE_BASE_VERSION}${CIRCLE_BUILD_NUM}/g" ~/project/deb/control.amd64 | tee ~/project/deb/marine-sensorhub-mqtt/DEBIAN/control
+            cat ~/project/deb/marine-sensorhub-mqtt/DEBIAN/control
+            cp ~/build/amd64/marine-sensorhub-mqtt ~/project/deb/marine-sensorhub-mqtt/usr/local/bin/marine-sensorhub-mqtt
             cd ~/project/deb
-            rm ./mqtt-keepalive/DEBIAN/.gitkeep
-            rm ./mqtt-keepalive/usr/local/bin/.gitkeep
-            dpkg-deb --build mqtt-keepalive
+            rm ./marine-sensorhub-mqtt/DEBIAN/.gitkeep
+            rm ./marine-sensorhub-mqtt/usr/local/bin/.gitkeep
+            dpkg-deb --build marine-sensorhub-mqtt
             ls
-            cp mqtt-keepalive.deb ~/artifacts/mqtt-keepalive_${PACKAGE_BASE_VERSION}${CIRCLE_BUILD_NUM}_amd64.deb
+            cp marine-sensorhub-mqtt.deb ~/artifacts/marine-sensorhub-mqtt_${PACKAGE_BASE_VERSION}${CIRCLE_BUILD_NUM}_amd64.deb
       - run:
           name: Build arm64 deb package
           command: |
-            sed -e "s/%VER%/${PACKAGE_BASE_VERSION}${CIRCLE_BUILD_NUM}/g" ~/project/deb/control.arm64 | tee ~/project/deb/mqtt-keepalive/DEBIAN/control
-            cat ~/project/deb/mqtt-keepalive/DEBIAN/control
-            cp ~/build/arm64/mqtt-keepalive ~/project/deb/mqtt-keepalive/usr/local/bin/mqtt-keepalive
+            sed -e "s/%VER%/${PACKAGE_BASE_VERSION}${CIRCLE_BUILD_NUM}/g" ~/project/deb/control.arm64 | tee ~/project/deb/marine-sensorhub-mqtt/DEBIAN/control
+            cat ~/project/deb/marine-sensorhub-mqtt/DEBIAN/control
+            cp ~/build/arm64/marine-sensorhub-mqtt ~/project/deb/marine-sensorhub-mqtt/usr/local/bin/marine-sensorhub-mqtt
             cd ~/project/deb
-            dpkg-deb --build mqtt-keepalive
+            dpkg-deb --build marine-sensorhub-mqtt
             ls
-            cp mqtt-keepalive.deb ~/artifacts/route53-ddns_${PACKAGE_BASE_VERSION}${CIRCLE_BUILD_NUM}_arm64.deb
+            cp marine-sensorhub-mqtt.deb ~/artifacts/route53-ddns_${PACKAGE_BASE_VERSION}${CIRCLE_BUILD_NUM}_arm64.deb
       - run:
           name: List Artifacts
           command: ls -l -R ~/artifacts

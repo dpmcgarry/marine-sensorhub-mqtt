@@ -110,7 +110,7 @@ func configureLogging() *Logger {
 
 func newRollingFile() io.Writer {
 	return &lumberjack.Logger{
-		Filename:   path.Join(viper.GetString("logdir") + "mqtt-keepalive.log"),
+		Filename:   path.Join(viper.GetString("logdir") + "marine-sensorhub-mqtt.log"),
 		MaxBackups: 5,
 		MaxSize:    20,
 		MaxAge:     30,
