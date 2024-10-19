@@ -41,7 +41,7 @@ var pubCmd = &cobra.Command{
 			os.Exit(2)
 		}
 		log.Info().Msg("Loading Server Config")
-		serverConfs, err := internal.LoadServerConfig()
+		serverConfs, err := internal.LoadPublishServerConfig()
 		if err != nil {
 			log.Fatal().Msgf("Error reading Server config. Not much I can do except give up. %v", err.Error())
 			os.Exit(2)

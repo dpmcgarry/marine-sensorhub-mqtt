@@ -39,46 +39,46 @@ type GlobalConfig struct {
 	DisconnectTimeout int
 }
 
-func LoadServerConfig() ([]MQTTDestination, error) {
+func LoadPublishServerConfig() ([]MQTTDestination, error) {
 	var destinations []MQTTDestination
-	if !viper.IsSet("servers") {
-		log.Error().Msg("No Servers Configured")
-		return nil, errors.New("no servers set in viper config")
+	if !viper.IsSet("pubservers") {
+		log.Error().Msg("No Publish Servers Configured")
+		return nil, errors.New("no publish servers set in viper config")
 	}
-	genericConf := viper.Get("servers")
+	genericConf := viper.Get("pubservers")
 	// Type assertion to convert 'any' to 'map[string]interface{}'
 	serverConf, ok := genericConf.(map[string]interface{})
 	if !ok {
-		log.Error().Msg("Conversion failed: Server config is not formatted correctly")
-		return nil, errors.New("server configuration formatting invalid")
+		log.Error().Msg("Conversion failed: Publish Server config is not formatted correctly")
+		return nil, errors.New("publish server configuration formatting invalid")
 	}
 
 	for k := range serverConf {
 		dest := MQTTDestination{}
 		log.Debug().Msgf("Server: %v", k)
 		dest.Host = k
-		if !viper.IsSet("servers." + k + ".topics") {
+		if !viper.IsSet("pubservers." + k + ".topics") {
 			log.Error().Msgf("No Topics Configured for host %v", k)
 			return nil, fmt.Errorf("no topics set for host %v", k)
 		}
-		topics := viper.GetStringSlice("servers." + k + ".topics")
+		topics := viper.GetStringSlice("pubservers." + k + ".topics")
 		for _, topic := range topics {
 			log.Debug().Msgf("Topic %v", topic)
 			dest.Topics = append(dest.Topics, topic)
 		}
 
-		if viper.IsSet("servers." + k + ".username") {
-			dest.Username = viper.GetString("servers." + k + ".username")
+		if viper.IsSet("pubservers." + k + ".username") {
+			dest.Username = viper.GetString("pubservers." + k + ".username")
 			log.Debug().Msgf("Username %v", dest.Username)
 		}
 
-		if viper.IsSet("servers." + k + ".password") {
-			dest.Password = viper.GetString("servers." + k + ".password")
+		if viper.IsSet("pubservers." + k + ".password") {
+			dest.Password = viper.GetString("pubservers." + k + ".password")
 			log.Trace().Msgf("Password %v", dest.Password)
 		}
 
-		if viper.IsSet("servers." + k + ".cafile") {
-			cafilename := viper.GetString("servers." + k + ".cafile")
+		if viper.IsSet("pubservers." + k + ".cafile") {
+			cafilename := viper.GetString("pubservers." + k + ".cafile")
 			log.Debug().Msgf("Using CA File %v", cafilename)
 			cabytes, err := os.ReadFile(cafilename)
 			if err != nil {

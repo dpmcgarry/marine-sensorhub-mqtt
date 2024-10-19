@@ -54,6 +54,7 @@ func PublishMessage(globalconf GlobalConfig, serverConf MQTTDestination) {
 			RootCAs: rootCAs,
 		}
 		mqttOpts.SetTLSConfig(tlsConfig)
+		log.Debug().Msg("Configured TLS")
 	}
 	client := MQTT.NewClient(mqttOpts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
