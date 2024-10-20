@@ -33,10 +33,22 @@ type MQTTDestination struct {
 	CACert   []byte
 }
 
+type SubscriptionConfig struct {
+	Host             string
+	Username         string
+	Password         string
+	CACert           []byte
+	ESPMSHRootTopic  string
+	SignalKRootTopic string
+	CerboRootTopic   string
+}
+
 type GlobalConfig struct {
 	Interval          int
 	PublishTimeout    int
 	DisconnectTimeout int
+	MACtoName         map[string]string
+	N2KtoName         map[string]string
 }
 
 func LoadPublishServerConfig() ([]MQTTDestination, error) {
@@ -93,13 +105,61 @@ func LoadPublishServerConfig() ([]MQTTDestination, error) {
 	return destinations, nil
 }
 
+func LoadSubscribeServerConfig() (SubscriptionConfig, error) {
+	subConf := SubscriptionConfig{}
+	if !viper.IsSet("subscription") {
+		log.Error().Msg("No Subscription Information Configured")
+		return SubscriptionConfig{}, errors.New("no subscription information set in viper config")
+	}
+	subscriptionMap := viper.GetStringMapString("subscription")
+	v, ok := subscriptionMap["server"]
+	if ok {
+		log.Debug().Msgf("Setting host: %v", v)
+		subConf.Host = v
+	} else {
+		log.Error().Msg("Server is required but is not configured")
+		return SubscriptionConfig{}, errors.New("server is required but is not set in viper config")
+	}
+	var configItems = []string{"esp-msh-root-topic", "signalk-root-topic", "cerbo-root-topic", "username", "password", "cafile"}
+	for _, confItem := range configItems {
+		v, ok = subscriptionMap[confItem]
+		if ok {
+			log.Debug().Msgf("Setting %v: %v", confItem, v)
+			switch confItem {
+			case "esp-msh-root-topic":
+				subConf.ESPMSHRootTopic = v
+			case "signalk-root-topic":
+				subConf.SignalKRootTopic = v
+			case "cerbo-root-topic":
+				subConf.CerboRootTopic = v
+			case "username":
+				subConf.Username = v
+			case "password":
+				subConf.Password = v
+			case "cafile":
+				log.Debug().Msgf("Using CA File %v", v)
+				cabytes, err := os.ReadFile(v)
+				if err != nil {
+					log.Warn().Msgf("Error Reading Defined CA File: %v", err.Error())
+				}
+				log.Debug().Msgf("Loaded CAFile %v", v)
+				subConf.CACert = cabytes
+			}
+		} else {
+			log.Trace().Msgf("%v not found. Continuing", confItem)
+		}
+	}
+
+	return subConf, nil
+}
+
 func LoadGlobalConfig() (GlobalConfig, error) {
 	globalConf := GlobalConfig{}
-	if !viper.IsSet("interval") {
+	if !viper.IsSet("publishinterval") {
 		log.Error().Msg("Interval not configured")
 		return GlobalConfig{}, errors.New("interval not set")
 	}
-	globalConf.Interval = viper.GetInt("interval")
+	globalConf.Interval = viper.GetInt("publishinterval")
 	if !(globalConf.Interval > 0) {
 		log.Error().Msgf("Interval set to invalid value: %v", globalConf.Interval)
 		return GlobalConfig{}, fmt.Errorf("interval set to invalid value %v", globalConf.Interval)
@@ -125,5 +185,15 @@ func LoadGlobalConfig() (GlobalConfig, error) {
 		return GlobalConfig{}, fmt.Errorf("disconnecttimeout set to invalid value %v", globalConf.DisconnectTimeout)
 	}
 	log.Debug().Msgf("Disconnect Timeout Set to: %v", globalConf.DisconnectTimeout)
+	if viper.IsSet("MACtoName") {
+		log.Debug().Msg("Loading MAC Address mapping to name")
+		globalConf.MACtoName = viper.GetStringMapString("MACtoName")
+		log.Debug().Msgf("Got %v MAC to Name mappings", len(globalConf.MACtoName))
+	}
+	if viper.IsSet("N2KtoName") {
+		log.Debug().Msg("Loading NMEA 2k mapping to name")
+		globalConf.N2KtoName = viper.GetStringMapString("N2KtoName")
+		log.Debug().Msgf("Got %v NMEA to Name mappings", len(globalConf.N2KtoName))
+	}
 	return globalConf, nil
 }
