@@ -18,6 +18,8 @@ package cmd
 
 import (
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/dpmcgarry/marine-sensorhub-mqtt/internal"
@@ -45,8 +47,24 @@ When messages are received, processes them.`,
 			os.Exit(2)
 		}
 		log.Debug().Msgf("%v", subConf)
+		internal.HandleSubscriptions(globalConf, subConf)
 		if isDaemon {
 			log.Info().Msg("Running in daemon mode")
+			sigs := make(chan os.Signal, 1)
+			signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+			done := make(chan bool, 1)
+
+			go func() {
+
+				sig := <-sigs
+				log.Info().Msgf("Got Signal: %v", sig)
+				done <- true
+			}()
+
+			log.Info().Msg("Awaiting Signal")
+			<-done
+			log.Info().Msg("Exiting")
 		} else {
 			log.Info().Msgf("Will only run for %v iterations", numIter)
 			for i := 0; i < int(numIter); i++ {
