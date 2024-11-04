@@ -34,6 +34,7 @@ func OnMSHMessage(client MQTT.Client, message MQTT.Message) {
 		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
 	}
 	log.Debug().Msgf("JSON: %v", jsonData)
+	meas := SensorMeasurement{}
 	for k, v := range jsonData {
 		log.Debug().Msgf("Key: %v", k)
 		valType := reflect.TypeOf(v)
@@ -41,16 +42,23 @@ func OnMSHMessage(client MQTT.Client, message MQTT.Message) {
 		switch valType.Kind() {
 		case reflect.Bool:
 			log.Debug().Msg("Bool")
+			meas.BoolFields[k] = v.(bool)
 		case reflect.String:
 			log.Debug().Msg("String")
+			meas.StringFields[k] = v.(string)
 		case reflect.Float64:
 			if v == float64(int64(v.(float64))) {
 				log.Debug().Msg("Int64")
+				meas.IntFields[k] = v.(int64)
 			} else {
 				log.Debug().Msg("Float64")
+				meas.FloatFields[k] = v.(float64)
 			}
 		default:
 			log.Warn().Msgf("Ruh Roh")
 		}
+	}
+	if meas.Timestamp.IsZero() {
+		log.Warn().Msg("Timestamp is nil")
 	}
 }

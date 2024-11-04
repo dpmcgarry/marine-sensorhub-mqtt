@@ -25,7 +25,7 @@ import (
 )
 
 func HandleSubscriptions(globalconf GlobalConfig, subscribeconf SubscriptionConfig) {
-	log.Debug().Msgf("Will publish to %v", subscribeconf.Host)
+	log.Debug().Msgf("Will subscribe on server %v", subscribeconf.Host)
 	mqttOpts := MQTT.NewClientOptions()
 	mqttOpts.AddBroker(subscribeconf.Host)
 	if subscribeconf.Username != "" {
