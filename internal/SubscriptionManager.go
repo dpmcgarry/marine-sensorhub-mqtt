@@ -59,7 +59,9 @@ func HandleSubscriptions(globalconf GlobalConfig, subscribeconf SubscriptionConf
 		return
 	}
 
-	if token := mqttClient.Subscribe(subscribeconf.ESPMSHRootTopic+"#", byte(0), OnMSHMessage); token.Wait() && token.Error() != nil {
-		panic(token.Error())
+	topic := subscribeconf.ESPMSHRootTopic + "ble/temperature/#"
+	log.Info().Msgf("Subscribing to topic: %v", topic)
+	if token := mqttClient.Subscribe(topic, byte(0), OnBLETemperatureMessage); token.Wait() && token.Error() != nil {
+		log.Warn().Msgf("Error subscribing to topic %v with error %v", topic, token.Error())
 	}
 }
