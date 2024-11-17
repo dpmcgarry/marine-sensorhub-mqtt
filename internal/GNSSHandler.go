@@ -25,24 +25,32 @@ import (
 )
 
 type GNSS struct {
-	Source string
-	AntennaAlt float64
-	Sattelites int64
-	HozDilution float64
-	PosDilution float64
-	GeoidalSep float64
-	Type string
+	Source        string
+	AntennaAlt    float64
+	Sattelites    int64
+	HozDilution   float64
+	PosDilution   float64
+	GeoidalSep    float64
+	Type          string
 	MethodQuality string
-	SatsInView int64
-	Timestamp time.Time
+	SatsInView    int64
+	Timestamp     time.Time
 }
 
 func OnGNSSMessage(client MQTT.Client, message MQTT.Message) {
 	log.Debug().Msgf("Got a message from: %v", message.Topic())
-	bleTemp := BLETemperature{}
-	err := json.Unmarshal(message.Payload(), &bleTemp)
+	gnss := GNSS{}
+	err := json.Unmarshal(message.Payload(), &gnss)
 	if err != nil {
 		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
 	}
-	log.Debug().Msgf("JSON: %v", bleTemp)
+	gnss.LogJSON()
+}
+
+func (meas GNSS) LogJSON() {
+	jsonData, err := json.Marshal(meas)
+	if err != nil {
+		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
+	}
+	log.Debug().Msgf("BLETemp: %v", string(jsonData))
 }

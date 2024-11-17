@@ -25,29 +25,46 @@ import (
 )
 
 type ESPStatus struct {
-	MAC       string
-	Location  string
-	IPAddress    string
-	MSHVersion string
-	FreeSRAM     int64
-	FreeHeap int64
-	FreePSRAM int64
+	MAC                string
+	Location           string `json:"Location,omitempty"`
+	IPAddress          string
+	MSHVersion         string
+	FreeSRAM           int64 `json:"FreeSRAM,omitempty"`
+	FreeHeap           int64 `json:"FreeHeap,omitempty"`
+	FreePSRAM          int64 `json:"FreePSRAM,omitempty"`
 	WiFiReconnectCount int64
 	MQTTReconnectCount int64
-	BLEEnabled bool
-	RTDEnabled bool
-	WiFiRSSI int64
-	HasTime bool
-	MasResetMQTT bool
-	Timestamp time.Time
+	BLEEnabled         bool
+	RTDEnabled         bool
+	WiFiRSSI           int64
+	HasTime            bool
+	MasResetMQTT       bool
+	Timestamp          time.Time
 }
 
 func OnESPStatusMessage(client MQTT.Client, message MQTT.Message) {
 	log.Debug().Msgf("Got a message from: %v", message.Topic())
-	bleTemp := BLETemperature{}
-	err := json.Unmarshal(message.Payload(), &bleTemp)
+	espStatus := ESPStatus{}
+	err := json.Unmarshal(message.Payload(), &espStatus)
 	if err != nil {
 		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
 	}
-	log.Debug().Msgf("JSON: %v", bleTemp)
+
+	loc, ok := SharedSubscriptionConfig.MACtoLocation[espStatus.MAC]
+	if ok {
+		espStatus.Location = loc
+	}
+	if espStatus.Timestamp.IsZero() {
+		espStatus.Timestamp = time.Now()
+	}
+
+	espStatus.LogJSON()
+}
+
+func (meas ESPStatus) LogJSON() {
+	jsonData, err := json.Marshal(meas)
+	if err != nil {
+		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
+	}
+	log.Debug().Msgf("BLETemp: %v", string(jsonData))
 }

@@ -26,10 +26,10 @@ import (
 
 type BLETemperature struct {
 	MAC            string
-	Location       string
+	Location       string `json:"Location,omitempty"`
 	TempF          float64
-	BatteryPercent float64
-	Humidity       float64
+	BatteryPercent float64 `json:"BatteryPct,omitempty"`
+	Humidity       float64 `json:"Humidity,omitempty"`
 	RSSI           int64
 	Timestamp      time.Time
 }
@@ -41,5 +41,21 @@ func OnBLETemperatureMessage(client MQTT.Client, message MQTT.Message) {
 	if err != nil {
 		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
 	}
-	log.Debug().Msgf("JSON: %v", bleTemp)
+
+	loc, ok := SharedSubscriptionConfig.MACtoLocation[bleTemp.MAC]
+	if ok {
+		bleTemp.Location = loc
+	}
+	if bleTemp.Timestamp.IsZero() {
+		bleTemp.Timestamp = time.Now()
+	}
+	bleTemp.LogJSON()
+}
+
+func (meas BLETemperature) LogJSON() {
+	jsonData, err := json.Marshal(meas)
+	if err != nil {
+		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
+	}
+	log.Debug().Msgf("BLETemp: %v", string(jsonData))
 }

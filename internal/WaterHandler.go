@@ -33,10 +33,18 @@ type Water struct {
 
 func OnWaterMessage(client MQTT.Client, message MQTT.Message) {
 	log.Debug().Msgf("Got a message from: %v", message.Topic())
-	bleTemp := BLETemperature{}
-	err := json.Unmarshal(message.Payload(), &bleTemp)
+	water := Water{}
+	err := json.Unmarshal(message.Payload(), &water)
 	if err != nil {
 		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
 	}
-	log.Debug().Msgf("JSON: %v", bleTemp)
+	water.LogJSON()
+}
+
+func (meas Water) LogJSON() {
+	jsonData, err := json.Marshal(meas)
+	if err != nil {
+		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
+	}
+	log.Debug().Msgf("BLETemp: %v", string(jsonData))
 }

@@ -25,19 +25,27 @@ import (
 )
 
 type Steering struct {
-	Source string
-	RudderAngle float64
-	AutopilotState string
+	Source           string
+	RudderAngle      float64
+	AutopilotState   string
 	TargetHeadingMag float64
-	Timestamp time.Time
+	Timestamp        time.Time
 }
 
 func OnSteeringMessage(client MQTT.Client, message MQTT.Message) {
 	log.Debug().Msgf("Got a message from: %v", message.Topic())
-	bleTemp := BLETemperature{}
-	err := json.Unmarshal(message.Payload(), &bleTemp)
+	steer := Steering{}
+	err := json.Unmarshal(message.Payload(), &steer)
 	if err != nil {
 		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
 	}
-	log.Debug().Msgf("JSON: %v", bleTemp)
+	steer.LogJSON()
+}
+
+func (meas Steering) LogJSON() {
+	jsonData, err := json.Marshal(meas)
+	if err != nil {
+		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
+	}
+	log.Debug().Msgf("BLETemp: %v", string(jsonData))
 }

@@ -18,6 +18,7 @@ package internal
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
@@ -25,20 +26,53 @@ import (
 )
 
 type Wind struct {
-	Source string
-	SpeedApp float64
-	AngleApp float64
-	SOG float64
+	Source        string
+	SpeedApp      float64
+	AngleApp      float64
+	SOG           float64
 	DirectionTrue float64
-	Timestamp time.Time
+	Timestamp     time.Time
 }
 
 func OnWindMessage(client MQTT.Client, message MQTT.Message) {
 	log.Debug().Msgf("Got a message from: %v", message.Topic())
-	bleTemp := BLETemperature{}
-	err := json.Unmarshal(message.Payload(), &bleTemp)
+	measurement := message.Topic()[strings.LastIndex(message.Topic(), "/")+1:]
+	log.Debug().Msgf("Got Measurement: %v", measurement)
+	var rawData map[string]any
+	err := json.Unmarshal(message.Payload(), &rawData)
 	if err != nil {
 		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
 	}
-	log.Debug().Msgf("JSON: %v", bleTemp)
+	wind := Wind{}
+	wind.Source = rawData["$source"].(string)
+	wind.Timestamp, err = time.Parse(ISOTimeLayout, rawData["timestamp"].(string))
+	if err != nil {
+		log.Warn().Msgf("Error parsing time string: %v", err.Error())
+	}
+	switch measurement {
+	case "speedOverGround":
+		wind.SOG = rawData["value"].(float64)
+	case "directionTrue":
+		wind.DirectionTrue = rawData["value"].(float64)
+	case "speedApparent":
+		wind.SpeedApp = rawData["value"].(float64)
+	case "angleApparent":
+		wind.AngleApp = rawData["value"].(float64)
+	}
+	name, ok := SharedSubscriptionConfig.N2KtoName[wind.Source]
+	if ok {
+		wind.Source = name
+	}
+	if wind.Timestamp.IsZero() {
+		wind.Timestamp = time.Now()
+	}
+	wind.LogJSON()
+}
+
+func (meas Wind) LogJSON() {
+	jsonData, err := json.Marshal(meas)
+	if err != nil {
+		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
+	}
+	log.Debug().Msgf("BLETemp: %v", string(jsonData))
 }

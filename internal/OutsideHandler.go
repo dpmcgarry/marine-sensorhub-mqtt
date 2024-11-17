@@ -25,18 +25,26 @@ import (
 )
 
 type Outside struct {
-	Source string
-	TempF float64
-	Pressure float64
+	Source    string
+	TempF     float64
+	Pressure  float64
 	Timestamp time.Time
 }
 
 func OnOutsideMessage(client MQTT.Client, message MQTT.Message) {
 	log.Debug().Msgf("Got a message from: %v", message.Topic())
-	bleTemp := BLETemperature{}
-	err := json.Unmarshal(message.Payload(), &bleTemp)
+	out := Outside{}
+	err := json.Unmarshal(message.Payload(), &out)
 	if err != nil {
 		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
 	}
-	log.Debug().Msgf("JSON: %v", bleTemp)
+	out.LogJSON()
+}
+
+func (meas Outside) LogJSON() {
+	jsonData, err := json.Marshal(meas)
+	if err != nil {
+		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
+	}
+	log.Debug().Msgf("BLETemp: %v", string(jsonData))
 }

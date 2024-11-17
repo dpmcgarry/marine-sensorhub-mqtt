@@ -25,27 +25,35 @@ import (
 )
 
 type Propulsion struct {
-	Device string
-	Source string
-	RPM int64
-	BoostPSI float64
-	OilTempF float64
-	OilPressure float64
-	CoolantTempF float64
-	RunTime int64
-	EngineLoad float64
-	EngineTorque float64
-	TransOilTempF float64
+	Device           string
+	Source           string
+	RPM              int64
+	BoostPSI         float64
+	OilTempF         float64
+	OilPressure      float64
+	CoolantTempF     float64
+	RunTime          int64
+	EngineLoad       float64
+	EngineTorque     float64
+	TransOilTempF    float64
 	TransOilPressure float64
-	Timestamp time.Time
+	Timestamp        time.Time
 }
 
 func OnPropulsionMessage(client MQTT.Client, message MQTT.Message) {
 	log.Debug().Msgf("Got a message from: %v", message.Topic())
-	bleTemp := BLETemperature{}
-	err := json.Unmarshal(message.Payload(), &bleTemp)
+	prop := Propulsion{}
+	err := json.Unmarshal(message.Payload(), &prop)
 	if err != nil {
 		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
 	}
-	log.Debug().Msgf("JSON: %v", bleTemp)
+	prop.LogJSON()
+}
+
+func (meas Propulsion) LogJSON() {
+	jsonData, err := json.Marshal(meas)
+	if err != nil {
+		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
+	}
+	log.Debug().Msgf("BLETemp: %v", string(jsonData))
 }

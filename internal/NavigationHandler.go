@@ -25,27 +25,35 @@ import (
 )
 
 type Navigation struct {
-	Source string
-	Lat float64
-	Lon float64
-	SOG float64
-	ROT float64
-	COGTrue float64
-	HeadingMag float64
+	Source       string
+	Lat          float64
+	Lon          float64
+	SOG          float64
+	ROT          float64
+	COGTrue      float64
+	HeadingMag   float64
 	MagVariation float64
 	MagDeviation float64
-	Attitude float64
-	HeadingTrue float64
-	STW float64
-	Timestamp time.Time
+	Attitude     float64
+	HeadingTrue  float64
+	STW          float64
+	Timestamp    time.Time
 }
 
 func OnNavigationMessage(client MQTT.Client, message MQTT.Message) {
 	log.Debug().Msgf("Got a message from: %v", message.Topic())
-	bleTemp := BLETemperature{}
-	err := json.Unmarshal(message.Payload(), &bleTemp)
+	nav := Navigation{}
+	err := json.Unmarshal(message.Payload(), &nav)
 	if err != nil {
 		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
 	}
-	log.Debug().Msgf("JSON: %v", bleTemp)
+	nav.LogJSON()
+}
+
+func (meas Navigation) LogJSON() {
+	jsonData, err := json.Marshal(meas)
+	if err != nil {
+		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
+	}
+	log.Debug().Msgf("BLETemp: %v", string(jsonData))
 }

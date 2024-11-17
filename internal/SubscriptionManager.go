@@ -24,7 +24,11 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+var SharedSubscriptionConfig *SubscriptionConfig
+var ISOTimeLayout string = "2006-01-02T15:04:05.000Z"
+
 func HandleSubscriptions(globalconf GlobalConfig, subscribeconf SubscriptionConfig) {
+	SharedSubscriptionConfig = &subscribeconf
 	log.Debug().Msgf("Will subscribe on server %v", subscribeconf.Host)
 	mqttOpts := MQTT.NewClientOptions()
 	mqttOpts.AddBroker(subscribeconf.Host)
@@ -61,24 +65,24 @@ func HandleSubscriptions(globalconf GlobalConfig, subscribeconf SubscriptionConf
 
 	topic := subscribeconf.ESPMSHRootTopic + "ble/temperature/#"
 	addSubscription(topic, OnBLETemperatureMessage, mqttClient)
-	topic = subscribeconf.ESPMSHRootTopic + "rtd/temperature/#"
-	addSubscription(topic, OnPHYTemperatureMessage, mqttClient)
-	topic = subscribeconf.ESPMSHRootTopic + "esp/status/#"
-	addSubscription(topic, OnESPStatusMessage, mqttClient)
-	topic = subscribeconf.SignalKRootTopic + "vessels/self/navigation/$"
-	addSubscription(topic, OnNavigationMessage, mqttClient)
-	topic = subscribeconf.SignalKRootTopic + "vessels/self/navigation/gnss/#"
-	addSubscription(topic, OnGNSSMessage, mqttClient)
-	topic = subscribeconf.SignalKRootTopic + "vessels/self/steering/#"
-	addSubscription(topic, OnSteeringMessage, mqttClient)
+	// topic = subscribeconf.ESPMSHRootTopic + "rtd/temperature/#"
+	// addSubscription(topic, OnPHYTemperatureMessage, mqttClient)
+	// topic = subscribeconf.ESPMSHRootTopic + "esp/status/#"
+	// addSubscription(topic, OnESPStatusMessage, mqttClient)
+	// topic = subscribeconf.SignalKRootTopic + "vessels/self/navigation/$"
+	// addSubscription(topic, OnNavigationMessage, mqttClient)
+	// topic = subscribeconf.SignalKRootTopic + "vessels/self/navigation/gnss/#"
+	// addSubscription(topic, OnGNSSMessage, mqttClient)
+	// topic = subscribeconf.SignalKRootTopic + "vessels/self/steering/#"
+	// addSubscription(topic, OnSteeringMessage, mqttClient)
 	topic = subscribeconf.SignalKRootTopic + "vessels/self/environment/wind/#"
 	addSubscription(topic, OnWindMessage, mqttClient)
-	topic = subscribeconf.SignalKRootTopic + "vessels/self/environment/water/#"
-	addSubscription(topic, OnWaterMessage, mqttClient)
-	topic = subscribeconf.SignalKRootTopic + "vessels/self/environment/depth/#"
-	addSubscription(topic, OnWaterMessage, mqttClient)
-	topic = subscribeconf.SignalKRootTopic + "vessels/self/environment/outside/#"
-	addSubscription(topic, OnOutsideMessage, mqttClient)
+	// topic = subscribeconf.SignalKRootTopic + "vessels/self/environment/water/#"
+	// addSubscription(topic, OnWaterMessage, mqttClient)
+	// topic = subscribeconf.SignalKRootTopic + "vessels/self/environment/depth/#"
+	// addSubscription(topic, OnWaterMessage, mqttClient)
+	// topic = subscribeconf.SignalKRootTopic + "vessels/self/environment/outside/#"
+	// addSubscription(topic, OnOutsideMessage, mqttClient)
 
 }
 

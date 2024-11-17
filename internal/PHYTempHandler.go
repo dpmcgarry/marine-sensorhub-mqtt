@@ -26,19 +26,34 @@ import (
 
 type PHYTemperature struct {
 	MAC       string
-	Location  string
-	Device    string
-	Component string
+	Location  string `json:"Location,omitempty"`
+	Device    string `json:"Device,omitempty"`
+	Component string `json:"Component,omitempty"`
 	TempF     float64
 	Timestamp time.Time
 }
 
 func OnPHYTemperatureMessage(client MQTT.Client, message MQTT.Message) {
 	log.Debug().Msgf("Got a message from: %v", message.Topic())
-	bleTemp := BLETemperature{}
-	err := json.Unmarshal(message.Payload(), &bleTemp)
+	phyTemp := PHYTemperature{}
+	err := json.Unmarshal(message.Payload(), &phyTemp)
 	if err != nil {
 		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
 	}
-	log.Debug().Msgf("JSON: %v", bleTemp)
+	loc, ok := SharedSubscriptionConfig.MACtoLocation[phyTemp.MAC]
+	if ok {
+		phyTemp.Location = loc
+	}
+	if phyTemp.Timestamp.IsZero() {
+		phyTemp.Timestamp = time.Now()
+	}
+	phyTemp.LogJSON()
+}
+
+func (meas PHYTemperature) LogJSON() {
+	jsonData, err := json.Marshal(meas)
+	if err != nil {
+		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
+	}
+	log.Debug().Msgf("BLETemp: %v", string(jsonData))
 }
