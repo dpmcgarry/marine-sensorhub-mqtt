@@ -65,12 +65,45 @@ type SubscriptionConfig struct {
 	WindLogEn        bool
 }
 
-type GlobalConfig struct {
+type PublishConfig struct {
 	Interval          int
 	PublishTimeout    int
 	DisconnectTimeout int
-	MACtoName         map[string]string
-	N2KtoName         map[string]string
+}
+
+func LoadPublishConfig() (PublishConfig, error) {
+	publishConf := PublishConfig{}
+	if !viper.IsSet("publish.interval") {
+		log.Error().Msg("Interval not configured")
+		return PublishConfig{}, errors.New("interval not set")
+	}
+	publishConf.Interval = viper.GetInt("publish.interval")
+	if !(publishConf.Interval > 0) {
+		log.Error().Msgf("Interval set to invalid value: %v", publishConf.Interval)
+		return PublishConfig{}, fmt.Errorf("interval set to invalid value %v", publishConf.Interval)
+	}
+	log.Debug().Msgf("Interval Set to: %v", publishConf.Interval)
+	if !viper.IsSet("publish.timeout") {
+		log.Error().Msg("Publish Timeout not configured")
+		return PublishConfig{}, errors.New("publishtimeout not set")
+	}
+	publishConf.PublishTimeout = viper.GetInt("publish.timeout")
+	if !(publishConf.PublishTimeout > 0) {
+		log.Error().Msgf("Publish Timeout set to invalid value: %v", publishConf.PublishTimeout)
+		return PublishConfig{}, fmt.Errorf("publishtimeout set to invalid value %v", publishConf.PublishTimeout)
+	}
+	log.Debug().Msgf("Publish Timeout Set to: %v", publishConf.PublishTimeout)
+	if !viper.IsSet("publish.disconnecttimeout") {
+		log.Error().Msg("Disconnect Timeout not configured")
+		return PublishConfig{}, errors.New("disconnecttimeout not set")
+	}
+	publishConf.DisconnectTimeout = viper.GetInt("publish.disconnecttimeout")
+	if !(publishConf.DisconnectTimeout > 0) {
+		log.Error().Msgf("Disconnect Timeout set to invalid value: %v", publishConf.DisconnectTimeout)
+		return PublishConfig{}, fmt.Errorf("disconnecttimeout set to invalid value %v", publishConf.DisconnectTimeout)
+	}
+	log.Debug().Msgf("Disconnect Timeout Set to: %v", publishConf.DisconnectTimeout)
+	return publishConf, nil
 }
 
 func LoadPublishServerConfig() ([]MQTTDestination, error) {
@@ -208,25 +241,25 @@ func LoadSubscribeServerConfig() (SubscriptionConfig, error) {
 		tmpmap := viper.GetStringMap("EnableSubscriptions")
 		for k, v := range tmpmap {
 			switch k {
-			case "BLE":
+			case "ble":
 				subConf.BLESubEn = v.(bool)
-			case "GNSS":
+			case "gnss":
 				subConf.GNSSSubEn = v.(bool)
-			case "ESP":
+			case "esp":
 				subConf.ESPSubEn = v.(bool)
-			case "Nav":
+			case "nav":
 				subConf.NavSubEn = v.(bool)
-			case "Outside":
+			case "outside":
 				subConf.OutsideSubEn = v.(bool)
-			case "PHY":
+			case "phy":
 				subConf.PHYSubEn = v.(bool)
-			case "Propulsion":
+			case "propulsion":
 				subConf.PropSubEn = v.(bool)
-			case "Steering":
+			case "steering":
 				subConf.SteerSubEn = v.(bool)
-			case "Water":
+			case "water":
 				subConf.WaterSubEn = v.(bool)
-			case "Wind":
+			case "wind":
 				subConf.WindSubEn = v.(bool)
 			default:
 				log.Warn().Msgf("Invalid Key %v found in EnableSubscriptions", k)
@@ -243,25 +276,25 @@ func LoadSubscribeServerConfig() (SubscriptionConfig, error) {
 		tmpmap := viper.GetStringMap("VerboseSubscriptionLogging")
 		for k, v := range tmpmap {
 			switch k {
-			case "BLE":
+			case "ble":
 				subConf.BLELogEn = v.(bool)
-			case "GNSS":
+			case "gnss":
 				subConf.GNSSLogEn = v.(bool)
-			case "ESP":
+			case "esp":
 				subConf.ESPLogEn = v.(bool)
-			case "Nav":
+			case "nav":
 				subConf.NavLogEn = v.(bool)
-			case "Outside":
+			case "outside":
 				subConf.OutsideLogEn = v.(bool)
-			case "PHY":
+			case "phy":
 				subConf.PHYLogEn = v.(bool)
-			case "Propulsion":
+			case "propulsion":
 				subConf.PropLogEn = v.(bool)
-			case "Steering":
+			case "steering":
 				subConf.SteerLogEn = v.(bool)
-			case "Water":
+			case "water":
 				subConf.WaterLogEn = v.(bool)
-			case "Wind":
+			case "wind":
 				subConf.WindLogEn = v.(bool)
 			default:
 				log.Warn().Msgf("Invalid Key %v found in VerboseSubscriptionLogging", k)
@@ -278,49 +311,4 @@ func LoadSubscribeServerConfig() (SubscriptionConfig, error) {
 	}
 
 	return subConf, nil
-}
-
-func LoadGlobalConfig() (GlobalConfig, error) {
-	globalConf := GlobalConfig{}
-	if !viper.IsSet("publishinterval") {
-		log.Error().Msg("Interval not configured")
-		return GlobalConfig{}, errors.New("interval not set")
-	}
-	globalConf.Interval = viper.GetInt("publishinterval")
-	if !(globalConf.Interval > 0) {
-		log.Error().Msgf("Interval set to invalid value: %v", globalConf.Interval)
-		return GlobalConfig{}, fmt.Errorf("interval set to invalid value %v", globalConf.Interval)
-	}
-	log.Debug().Msgf("Interval Set to: %v", globalConf.Interval)
-	if !viper.IsSet("publishtimeout") {
-		log.Error().Msg("Publish Timeout not configured")
-		return GlobalConfig{}, errors.New("publishtimeout not set")
-	}
-	globalConf.PublishTimeout = viper.GetInt("publishtimeout")
-	if !(globalConf.PublishTimeout > 0) {
-		log.Error().Msgf("Publish Timeout set to invalid value: %v", globalConf.PublishTimeout)
-		return GlobalConfig{}, fmt.Errorf("publishtimeout set to invalid value %v", globalConf.PublishTimeout)
-	}
-	log.Debug().Msgf("Publish Timeout Set to: %v", globalConf.PublishTimeout)
-	if !viper.IsSet("disconnecttimeout") {
-		log.Error().Msg("Disconnect Timeout not configured")
-		return GlobalConfig{}, errors.New("disconnecttimeout not set")
-	}
-	globalConf.DisconnectTimeout = viper.GetInt("disconnecttimeout")
-	if !(globalConf.DisconnectTimeout > 0) {
-		log.Error().Msgf("Disconnect Timeout set to invalid value: %v", globalConf.DisconnectTimeout)
-		return GlobalConfig{}, fmt.Errorf("disconnecttimeout set to invalid value %v", globalConf.DisconnectTimeout)
-	}
-	log.Debug().Msgf("Disconnect Timeout Set to: %v", globalConf.DisconnectTimeout)
-	if viper.IsSet("MACtoName") {
-		log.Debug().Msg("Loading MAC Address mapping to name")
-		globalConf.MACtoName = viper.GetStringMapString("MACtoName")
-		log.Debug().Msgf("Got %v MAC to Name mappings", len(globalConf.MACtoName))
-	}
-	if viper.IsSet("N2KtoName") {
-		log.Debug().Msg("Loading NMEA 2k mapping to name")
-		globalConf.N2KtoName = viper.GetStringMapString("N2KtoName")
-		log.Debug().Msgf("Got %v NMEA to Name mappings", len(globalConf.N2KtoName))
-	}
-	return globalConf, nil
 }

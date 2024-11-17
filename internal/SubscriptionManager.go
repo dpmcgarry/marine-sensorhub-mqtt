@@ -27,7 +27,7 @@ import (
 var SharedSubscriptionConfig *SubscriptionConfig
 var ISOTimeLayout string = "2006-01-02T15:04:05.000Z"
 
-func HandleSubscriptions(globalconf GlobalConfig, subscribeconf SubscriptionConfig) {
+func HandleSubscriptions(subscribeconf SubscriptionConfig) {
 	SharedSubscriptionConfig = &subscribeconf
 	log.Debug().Msgf("Will subscribe on server %v", subscribeconf.Host)
 	mqttOpts := MQTT.NewClientOptions()

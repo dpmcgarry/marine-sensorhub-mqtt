@@ -35,9 +35,19 @@ type Wind struct {
 }
 
 func OnWindMessage(client MQTT.Client, message MQTT.Message) {
-	log.Debug().Msgf("Got a message from: %v", message.Topic())
+	go handleWindMessage(message)
+}
+
+func handleWindMessage(message MQTT.Message) {
+	log.Trace().Msgf("Got a message from: %v", message.Topic())
+	if SharedSubscriptionConfig.WindLogEn {
+		log.Info().Msgf("Got a message from: %v", message.Topic())
+	}
 	measurement := message.Topic()[strings.LastIndex(message.Topic(), "/")+1:]
-	log.Debug().Msgf("Got Measurement: %v", measurement)
+	log.Trace().Msgf("Got Measurement: %v", measurement)
+	if SharedSubscriptionConfig.WindLogEn {
+		log.Info().Msgf("Got Measurement: %v", measurement)
+	}
 	var rawData map[string]any
 	err := json.Unmarshal(message.Payload(), &rawData)
 	if err != nil {
@@ -51,19 +61,21 @@ func OnWindMessage(client MQTT.Client, message MQTT.Message) {
 	}
 	switch measurement {
 	case "speedOverGround":
-		wind.SOG = rawData["value"].(float64)
+		wind.SOG = MetersPerSecondToKnots(rawData["value"].(float64))
 	case "directionTrue":
-		wind.DirectionTrue = rawData["value"].(float64)
+		wind.DirectionTrue = RadiansToDegrees(rawData["value"].(float64))
 	case "speedApparent":
-		wind.SpeedApp = rawData["value"].(float64)
+		wind.SpeedApp = MetersPerSecondToKnots(rawData["value"].(float64))
 	case "angleApparent":
-		wind.AngleApp = rawData["value"].(float64)
+		wind.AngleApp = RadiansToDegrees(rawData["value"].(float64))
 	default:
 		log.Warn().Msgf("Unknown measurement %v in %v", measurement, message.Topic())
 	}
-	name, ok := SharedSubscriptionConfig.N2KtoName[wind.Source]
+	name, ok := SharedSubscriptionConfig.N2KtoName[strings.ToLower(wind.Source)]
 	if ok {
 		wind.Source = name
+	} else {
+		log.Warn().Msgf("Name not found for Source %v", wind.Source)
 	}
 	if wind.Timestamp.IsZero() {
 		wind.Timestamp = time.Now()
@@ -76,5 +88,8 @@ func (meas Wind) LogJSON() {
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
 	}
-	log.Debug().Msgf("Wind: %v", string(jsonData))
+	log.Trace().Msgf("Wind: %v", string(jsonData))
+	if SharedSubscriptionConfig.WindLogEn {
+		log.Info().Msgf("Wind: %v", string(jsonData))
+	}
 }

@@ -27,7 +27,7 @@ import (
 
 // It isn't super efficient to be creating / tearing down connection each time
 // But that said the complexity of reusing connections isn't worth it at this point
-func PublishMessage(globalconf GlobalConfig, serverConf MQTTDestination) {
+func PublishMessage(publishConf PublishConfig, serverConf MQTTDestination) {
 	log.Debug().Msgf("Will publish to %v", serverConf.Host)
 	mqttOpts := MQTT.NewClientOptions()
 	mqttOpts.AddBroker(serverConf.Host)
@@ -64,7 +64,7 @@ func PublishMessage(globalconf GlobalConfig, serverConf MQTTDestination) {
 	for _, topic := range serverConf.Topics {
 		log.Info().Msgf("Publish message to host %v on topic %v", serverConf.Host, topic)
 		token := client.Publish(topic, byte(0), false, "")
-		token.WaitTimeout(time.Duration(globalconf.DisconnectTimeout) * time.Millisecond)
+		token.WaitTimeout(time.Duration(publishConf.DisconnectTimeout) * time.Millisecond)
 	}
-	client.Disconnect(uint(globalconf.DisconnectTimeout))
+	client.Disconnect(uint(publishConf.DisconnectTimeout))
 }

@@ -26,16 +26,27 @@ import (
 )
 
 type Outside struct {
-	Source    string    `json:"Source,omitempty"`
-	TempF     float64   `json:"TempF,omitempty"`
-	Pressure  float64   `json:"Pressure,omitempty"`
-	Timestamp time.Time `json:"Timestamp,omitempty"`
+	Source       string    `json:"Source,omitempty"`
+	TempF        float64   `json:"TempF,omitempty"`
+	Pressure     float64   `json:"Pressure,omitempty"`
+	PressureInHg float64   `json:"PressureInHg,omitempty"`
+	Timestamp    time.Time `json:"Timestamp,omitempty"`
 }
 
 func OnOutsideMessage(client MQTT.Client, message MQTT.Message) {
-	log.Debug().Msgf("Got a message from: %v", message.Topic())
+	go handleOutsideMessage(message)
+}
+
+func handleOutsideMessage(message MQTT.Message) {
+	log.Trace().Msgf("Got a message from: %v", message.Topic())
+	if SharedSubscriptionConfig.OutsideLogEn {
+		log.Info().Msgf("Got a message from: %v", message.Topic())
+	}
 	measurement := message.Topic()[strings.LastIndex(message.Topic(), "/")+1:]
-	log.Debug().Msgf("Got Measurement: %v", measurement)
+	log.Trace().Msgf("Got Measurement: %v", measurement)
+	if SharedSubscriptionConfig.OutsideLogEn {
+		log.Info().Msgf("Got Measurement: %v", measurement)
+	}
 	var rawData map[string]any
 	err := json.Unmarshal(message.Payload(), &rawData)
 	if err != nil {
@@ -49,15 +60,18 @@ func OnOutsideMessage(client MQTT.Client, message MQTT.Message) {
 	}
 	switch measurement {
 	case "temperature":
-		out.TempF = rawData["value"].(float64)
+		out.TempF = KelvinToFarenheit(rawData["value"].(float64))
 	case "pressure":
-		out.Pressure = rawData["value"].(float64)
+		out.Pressure = rawData["value"].(float64) / 100
+		out.PressureInHg = MillibarToInHg(out.Pressure)
 	default:
 		log.Warn().Msgf("Unknown measurement %v in %v", measurement, message.Topic())
 	}
-	name, ok := SharedSubscriptionConfig.N2KtoName[out.Source]
+	name, ok := SharedSubscriptionConfig.N2KtoName[strings.ToLower(out.Source)]
 	if ok {
 		out.Source = name
+	} else {
+		log.Warn().Msgf("Name not found for Source %v", out.Source)
 	}
 	if out.Timestamp.IsZero() {
 		out.Timestamp = time.Now()
@@ -70,5 +84,8 @@ func (meas Outside) LogJSON() {
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
 	}
-	log.Debug().Msgf("Outside: %v", string(jsonData))
+	log.Trace().Msgf("Outside: %v", string(jsonData))
+	if SharedSubscriptionConfig.OutsideLogEn {
+		log.Info().Msgf("Outside: %v", string(jsonData))
+	}
 }

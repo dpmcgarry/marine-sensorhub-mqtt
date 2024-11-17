@@ -34,8 +34,8 @@ var pubCmd = &cobra.Command{
 	Long:  `Publishes Keepalive Messages.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		log.Info().Msg("Starting Publish")
-		log.Info().Msg("Loading Global Config")
-		globalConf, err := internal.LoadGlobalConfig()
+		log.Info().Msg("Loading Publish Config")
+		publishConf, err := internal.LoadPublishConfig()
 		if err != nil {
 			log.Fatal().Msgf("Error reading Global config. Not much I can do except give up. %v", err.Error())
 			os.Exit(2)
@@ -50,19 +50,19 @@ var pubCmd = &cobra.Command{
 			log.Info().Msg("Running in daemon mode")
 			for {
 				for _, serverConf := range serverConfs {
-					internal.PublishMessage(globalConf, serverConf)
+					internal.PublishMessage(publishConf, serverConf)
 				}
-				log.Debug().Msgf("Sleeping for %v seconds", globalConf.Interval)
-				time.Sleep(time.Duration(globalConf.Interval) * time.Second)
+				log.Debug().Msgf("Sleeping for %v seconds", publishConf.Interval)
+				time.Sleep(time.Duration(publishConf.Interval) * time.Second)
 			}
 		} else {
 			log.Info().Msgf("Will only run for %v iterations", numIter)
 			for i := 0; i < int(numIter); i++ {
 				for _, serverConf := range serverConfs {
-					internal.PublishMessage(globalConf, serverConf)
+					internal.PublishMessage(publishConf, serverConf)
 				}
-				log.Debug().Msgf("Sleeping for %v seconds", globalConf.Interval)
-				time.Sleep(time.Duration(globalConf.Interval) * time.Second)
+				log.Debug().Msgf("Sleeping for %v seconds", publishConf.Interval)
+				time.Sleep(time.Duration(publishConf.Interval) * time.Second)
 			}
 		}
 	},

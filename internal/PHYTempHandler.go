@@ -18,6 +18,7 @@ package internal
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
@@ -34,15 +35,24 @@ type PHYTemperature struct {
 }
 
 func OnPHYTemperatureMessage(client MQTT.Client, message MQTT.Message) {
-	log.Debug().Msgf("Got a message from: %v", message.Topic())
+	go handlePHYTemperatureMessage(message)
+}
+
+func handlePHYTemperatureMessage(message MQTT.Message) {
+	log.Trace().Msgf("Got a message from: %v", message.Topic())
+	if SharedSubscriptionConfig.PHYLogEn {
+		log.Info().Msgf("Got a message from: %v", message.Topic())
+	}
 	phyTemp := PHYTemperature{}
 	err := json.Unmarshal(message.Payload(), &phyTemp)
 	if err != nil {
 		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
 	}
-	loc, ok := SharedSubscriptionConfig.MACtoLocation[phyTemp.MAC]
+	loc, ok := SharedSubscriptionConfig.MACtoLocation[strings.ToLower(phyTemp.MAC)]
 	if ok {
 		phyTemp.Location = loc
+	} else {
+		log.Warn().Msgf("Location not found for MAC %v", phyTemp.MAC)
 	}
 	if phyTemp.Timestamp.IsZero() {
 		phyTemp.Timestamp = time.Now()
@@ -55,5 +65,8 @@ func (meas PHYTemperature) LogJSON() {
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
 	}
-	log.Debug().Msgf("Physical Temp: %v", string(jsonData))
+	log.Trace().Msgf("Physical Temp: %v", string(jsonData))
+	if SharedSubscriptionConfig.PHYLogEn {
+		log.Info().Msgf("Physical Temp: %v", string(jsonData))
+	}
 }

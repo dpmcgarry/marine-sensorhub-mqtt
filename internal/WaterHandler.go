@@ -33,9 +33,19 @@ type Water struct {
 }
 
 func OnWaterMessage(client MQTT.Client, message MQTT.Message) {
-	log.Debug().Msgf("Got a message from: %v", message.Topic())
+	go handleWaterMessage(message)
+}
+
+func handleWaterMessage(message MQTT.Message) {
+	log.Trace().Msgf("Got a message from: %v", message.Topic())
+	if SharedSubscriptionConfig.WaterLogEn {
+		log.Info().Msgf("Got a message from: %v", message.Topic())
+	}
 	measurement := message.Topic()[strings.LastIndex(message.Topic(), "/")+1:]
-	log.Debug().Msgf("Got Measurement: %v", measurement)
+	log.Trace().Msgf("Got Measurement: %v", measurement)
+	if SharedSubscriptionConfig.WaterLogEn {
+		log.Info().Msgf("Got Measurement: %v", measurement)
+	}
 	var rawData map[string]any
 	err := json.Unmarshal(message.Payload(), &rawData)
 	if err != nil {
@@ -49,15 +59,17 @@ func OnWaterMessage(client MQTT.Client, message MQTT.Message) {
 	}
 	switch measurement {
 	case "temperature":
-		water.TempF = rawData["value"].(float64)
+		water.TempF = KelvinToFarenheit(rawData["value"].(float64))
 	case "belowTransducer":
-		water.DepthUnderTransducerFt = rawData["value"].(float64)
+		water.DepthUnderTransducerFt = MetersToFeet(rawData["value"].(float64))
 	default:
 		log.Warn().Msgf("Unknown measurement %v in %v", measurement, message.Topic())
 	}
-	name, ok := SharedSubscriptionConfig.N2KtoName[water.Source]
+	name, ok := SharedSubscriptionConfig.N2KtoName[strings.ToLower(water.Source)]
 	if ok {
 		water.Source = name
+	} else {
+		log.Warn().Msgf("Name not found for Source %v", water.Source)
 	}
 	if water.Timestamp.IsZero() {
 		water.Timestamp = time.Now()
@@ -70,5 +82,8 @@ func (meas Water) LogJSON() {
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
 	}
-	log.Debug().Msgf("Water: %v", string(jsonData))
+	log.Trace().Msgf("Water: %v", string(jsonData))
+	if SharedSubscriptionConfig.WaterLogEn {
+		log.Info().Msgf("Water: %v", string(jsonData))
+	}
 }

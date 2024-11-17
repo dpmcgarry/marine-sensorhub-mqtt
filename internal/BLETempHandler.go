@@ -18,6 +18,7 @@ package internal
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
@@ -35,16 +36,25 @@ type BLETemperature struct {
 }
 
 func OnBLETemperatureMessage(client MQTT.Client, message MQTT.Message) {
-	log.Debug().Msgf("Got a message from: %v", message.Topic())
+	go handleBLETemperatureMessage(message)
+}
+
+func handleBLETemperatureMessage(message MQTT.Message) {
+	log.Trace().Msgf("Got a message from: %v", message.Topic())
+	if SharedSubscriptionConfig.BLELogEn {
+		log.Info().Msgf("Got a message from: %v", message.Topic())
+	}
 	bleTemp := BLETemperature{}
 	err := json.Unmarshal(message.Payload(), &bleTemp)
 	if err != nil {
 		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
 	}
 
-	loc, ok := SharedSubscriptionConfig.MACtoLocation[bleTemp.MAC]
+	loc, ok := SharedSubscriptionConfig.MACtoLocation[strings.ToLower(bleTemp.MAC)]
 	if ok {
 		bleTemp.Location = loc
+	} else {
+		log.Warn().Msgf("Location not found for MAC %v", bleTemp.MAC)
 	}
 	if bleTemp.Timestamp.IsZero() {
 		bleTemp.Timestamp = time.Now()
@@ -57,5 +67,8 @@ func (meas BLETemperature) LogJSON() {
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
 	}
-	log.Debug().Msgf("BLETemp: %v", string(jsonData))
+	log.Trace().Msgf("BLETemp: %v", string(jsonData))
+	if SharedSubscriptionConfig.BLELogEn {
+		log.Info().Msgf("BLETemp: %v", string(jsonData))
+	}
 }

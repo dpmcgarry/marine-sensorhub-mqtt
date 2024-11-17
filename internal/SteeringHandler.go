@@ -34,9 +34,19 @@ type Steering struct {
 }
 
 func OnSteeringMessage(client MQTT.Client, message MQTT.Message) {
-	log.Debug().Msgf("Got a message from: %v", message.Topic())
+	go handleSteeringMessage(message)
+}
+
+func handleSteeringMessage(message MQTT.Message) {
+	log.Trace().Msgf("Got a message from: %v", message.Topic())
+	if SharedSubscriptionConfig.SteerLogEn {
+		log.Info().Msgf("Got a message from: %v", message.Topic())
+	}
 	measurement := message.Topic()[strings.LastIndex(message.Topic(), "/")+1:]
-	log.Debug().Msgf("Got Measurement: %v", measurement)
+	log.Trace().Msgf("Got Measurement: %v", measurement)
+	if SharedSubscriptionConfig.SteerLogEn {
+		log.Info().Msgf("Got Measurement: %v", measurement)
+	}
 	var rawData map[string]any
 	err := json.Unmarshal(message.Payload(), &rawData)
 	if err != nil {
@@ -50,7 +60,7 @@ func OnSteeringMessage(client MQTT.Client, message MQTT.Message) {
 	}
 	switch measurement {
 	case "rudderAngle":
-		steer.RudderAngle = rawData["value"].(float64)
+		steer.RudderAngle = RadiansToDegrees(rawData["value"].(float64))
 	case "autopilot":
 		break
 	case "state":
@@ -58,13 +68,15 @@ func OnSteeringMessage(client MQTT.Client, message MQTT.Message) {
 	case "target":
 		break
 	case "headingMagnetic":
-		steer.TargetHeadingMag = rawData["value"].(float64)
+		steer.TargetHeadingMag = RadiansToDegrees(rawData["value"].(float64))
 	default:
 		log.Warn().Msgf("Unknown measurement %v in %v", measurement, message.Topic())
 	}
-	name, ok := SharedSubscriptionConfig.N2KtoName[steer.Source]
+	name, ok := SharedSubscriptionConfig.N2KtoName[strings.ToLower(steer.Source)]
 	if ok {
 		steer.Source = name
+	} else {
+		log.Warn().Msgf("Name not found for Source %v", steer.Source)
 	}
 	if steer.Timestamp.IsZero() {
 		steer.Timestamp = time.Now()
@@ -77,5 +89,8 @@ func (meas Steering) LogJSON() {
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
 	}
-	log.Debug().Msgf("Steering: %v", string(jsonData))
+	log.Trace().Msgf("Steering: %v", string(jsonData))
+	if SharedSubscriptionConfig.SteerLogEn {
+		log.Info().Msgf("Steering: %v", string(jsonData))
+	}
 }

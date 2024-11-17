@@ -38,9 +38,19 @@ type GNSS struct {
 }
 
 func OnGNSSMessage(client MQTT.Client, message MQTT.Message) {
-	log.Debug().Msgf("Got a message from: %v", message.Topic())
+	go handleGNSSMessage(message)
+}
+
+func handleGNSSMessage(message MQTT.Message) {
+	log.Trace().Msgf("Got a message from: %v", message.Topic())
+	if SharedSubscriptionConfig.GNSSLogEn {
+		log.Info().Msgf("Got a message from: %v", message.Topic())
+	}
 	measurement := message.Topic()[strings.LastIndex(message.Topic(), "/")+1:]
-	log.Debug().Msgf("Got Measurement: %v", measurement)
+	log.Trace().Msgf("Got Measurement: %v", measurement)
+	if SharedSubscriptionConfig.GNSSLogEn {
+		log.Info().Msgf("Got Measurement: %v", measurement)
+	}
 	var rawData map[string]any
 	err := json.Unmarshal(message.Payload(), &rawData)
 	if err != nil {
@@ -74,9 +84,11 @@ func OnGNSSMessage(client MQTT.Client, message MQTT.Message) {
 	default:
 		log.Warn().Msgf("Unknown measurement %v in %v", measurement, message.Topic())
 	}
-	name, ok := SharedSubscriptionConfig.N2KtoName[gnss.Source]
+	name, ok := SharedSubscriptionConfig.N2KtoName[strings.ToLower(gnss.Source)]
 	if ok {
 		gnss.Source = name
+	} else {
+		log.Warn().Msgf("Name not found for Source %v", gnss.Source)
 	}
 	if gnss.Timestamp.IsZero() {
 		gnss.Timestamp = time.Now()
@@ -89,5 +101,8 @@ func (meas GNSS) LogJSON() {
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
 	}
-	log.Debug().Msgf("GNSS: %v", string(jsonData))
+	log.Trace().Msgf("GNSS: %v", string(jsonData))
+	if SharedSubscriptionConfig.GNSSLogEn {
+		log.Info().Msgf("GNSS: %v", string(jsonData))
+	}
 }

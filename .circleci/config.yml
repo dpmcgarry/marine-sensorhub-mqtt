@@ -56,6 +56,17 @@ jobs:
           name: Print Package Version
           command: echo ${PACKAGE_BASE_VERSION}${CIRCLE_BUILD_NUM}
       - run:
+          name: Clear Out GitKeep Files
+          command: |
+            cd ~/project/deb
+            find . -name .gitkeep -type f -delete
+      - run:
+          name: List Deb
+          command: ls -l -R ~/project/deb
+      - run:
+          name: Copy Sample Config to deb
+          command: cp ~/project/marine-sensorhub-mqtt.conf ~/project/deb/marine-sensorhub-mqtt/etc/marine-sensorhub-mqtt.conf
+      - run:
           name: Build amd64 deb package
           command: |
             sed -e "s/%VER%/${PACKAGE_BASE_VERSION}${CIRCLE_BUILD_NUM}/g" ~/project/deb/control.amd64 | tee ~/project/deb/marine-sensorhub-mqtt/DEBIAN/control

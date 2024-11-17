@@ -18,6 +18,7 @@ package internal
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
@@ -43,16 +44,25 @@ type ESPStatus struct {
 }
 
 func OnESPStatusMessage(client MQTT.Client, message MQTT.Message) {
-	log.Debug().Msgf("Got a message from: %v", message.Topic())
+	go handleESPStatusMessage(message)
+}
+
+func handleESPStatusMessage(message MQTT.Message) {
+	log.Trace().Msgf("Got a message from: %v", message.Topic())
+	if SharedSubscriptionConfig.ESPLogEn {
+		log.Info().Msgf("Got a message from: %v", message.Topic())
+	}
 	espStatus := ESPStatus{}
 	err := json.Unmarshal(message.Payload(), &espStatus)
 	if err != nil {
 		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
 	}
 
-	loc, ok := SharedSubscriptionConfig.MACtoLocation[espStatus.MAC]
+	loc, ok := SharedSubscriptionConfig.MACtoLocation[strings.ToLower(espStatus.MAC)]
 	if ok {
 		espStatus.Location = loc
+	} else {
+		log.Warn().Msgf("Location not found for MAC %v", espStatus.MAC)
 	}
 	if espStatus.Timestamp.IsZero() {
 		espStatus.Timestamp = time.Now()
@@ -66,5 +76,8 @@ func (meas ESPStatus) LogJSON() {
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
 	}
-	log.Debug().Msgf("ESP Status: %v", string(jsonData))
+	log.Trace().Msgf("ESP Status: %v", string(jsonData))
+	if SharedSubscriptionConfig.ESPLogEn {
+		log.Info().Msgf("ESP Status: %v", string(jsonData))
+	}
 }

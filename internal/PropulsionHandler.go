@@ -44,15 +44,24 @@ type Propulsion struct {
 }
 
 func OnPropulsionMessage(client MQTT.Client, message MQTT.Message) {
+	go handlePropulsionMessage(message)
+}
+
+func handlePropulsionMessage(message MQTT.Message) {
 	// TODO: Support Multiple Engines
-	log.Debug().Msgf("Got a message from: %v", message.Topic())
+	log.Trace().Msgf("Got a message from: %v", message.Topic())
+	if SharedSubscriptionConfig.PropLogEn {
+		log.Info().Msgf("Got a message from: %v", message.Topic())
+	}
 	measurement := message.Topic()[strings.LastIndex(message.Topic(), "/")+1:]
+	log.Trace().Msgf("Got Measurement: %v", measurement)
+	if SharedSubscriptionConfig.PropLogEn {
+		log.Info().Msgf("Got Measurement: %v", measurement)
+	}
 	isTranny := false
 	if strings.Contains(message.Topic(), "/transmission/") {
 		isTranny = true
 	}
-
-	log.Debug().Msgf("Got Measurement: %v", measurement)
 	var rawData map[string]any
 	err := json.Unmarshal(message.Payload(), &rawData)
 	if err != nil {
@@ -66,23 +75,23 @@ func OnPropulsionMessage(client MQTT.Client, message MQTT.Message) {
 	}
 	switch measurement {
 	case "revolutions":
-		prop.RPM = int64(rawData["value"].(float64))
+		prop.RPM = int64(rawData["value"].(float64)) * 60
 	case "boostPressure":
-		prop.BoostPSI = rawData["value"].(float64)
+		prop.BoostPSI = PascalToPSI(rawData["value"].(float64))
 	case "oilTemperature":
 		if isTranny {
-			prop.TransOilTempF = rawData["value"].(float64)
+			prop.TransOilTempF = KelvinToFarenheit(rawData["value"].(float64))
 		} else {
-			prop.OilTempF = rawData["value"].(float64)
+			prop.OilTempF = KelvinToFarenheit(rawData["value"].(float64))
 		}
 	case "oilPressure":
 		if isTranny {
-			prop.TransOilPressure = rawData["value"].(float64)
+			prop.TransOilPressure = PascalToPSI(rawData["value"].(float64))
 		} else {
-			prop.OilPressure = rawData["value"].(float64)
+			prop.OilPressure = PascalToPSI(rawData["value"].(float64))
 		}
 	case "temperature":
-		prop.CoolantTempF = rawData["value"].(float64)
+		prop.CoolantTempF = KelvinToFarenheit(rawData["value"].(float64))
 	case "alternatorVoltage":
 		prop.AltVoltage = rawData["value"].(float64)
 	case "transmission":
@@ -90,19 +99,21 @@ func OnPropulsionMessage(client MQTT.Client, message MQTT.Message) {
 	case "fuel":
 		break
 	case "rate":
-		prop.FuelRate = rawData["value"].(float64)
+		prop.FuelRate = CubicMetersPerSecondToGallonsPerHour(rawData["value"].(float64))
 	case "runTime":
 		prop.RunTime = int64(rawData["value"].(float64))
 	case "engineLoad":
-		prop.EngineLoad = rawData["value"].(float64)
+		prop.EngineLoad = rawData["value"].(float64) * 100
 	case "engineTorque":
-		prop.EngineTorque = rawData["value"].(float64)
+		prop.EngineTorque = rawData["value"].(float64) * 100
 	default:
 		log.Warn().Msgf("Unknown measurement %v in %v", measurement, message.Topic())
 	}
-	name, ok := SharedSubscriptionConfig.N2KtoName[prop.Source]
+	name, ok := SharedSubscriptionConfig.N2KtoName[strings.ToLower(prop.Source)]
 	if ok {
 		prop.Source = name
+	} else {
+		log.Warn().Msgf("Name not found for Source %v", prop.Source)
 	}
 	if prop.Timestamp.IsZero() {
 		prop.Timestamp = time.Now()
@@ -115,5 +126,8 @@ func (meas Propulsion) LogJSON() {
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
 	}
-	log.Debug().Msgf("Propulsion: %v", string(jsonData))
+	log.Trace().Msgf("Propulsion: %v", string(jsonData))
+	if SharedSubscriptionConfig.PropLogEn {
+		log.Info().Msgf("Propulsion: %v", string(jsonData))
+	}
 }

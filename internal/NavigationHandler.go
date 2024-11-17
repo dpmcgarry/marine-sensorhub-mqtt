@@ -45,9 +45,19 @@ type Navigation struct {
 }
 
 func OnNavigationMessage(client MQTT.Client, message MQTT.Message) {
-	log.Debug().Msgf("Got a message from: %v", message.Topic())
+	go handleNavigationMessage(message)
+}
+
+func handleNavigationMessage(message MQTT.Message) {
+	log.Trace().Msgf("Got a message from: %v", message.Topic())
+	if SharedSubscriptionConfig.NavLogEn {
+		log.Info().Msgf("Got a message from: %v", message.Topic())
+	}
 	measurement := message.Topic()[strings.LastIndex(message.Topic(), "/")+1:]
-	log.Debug().Msgf("Got Measurement: %v", measurement)
+	log.Trace().Msgf("Got Measurement: %v", measurement)
+	if SharedSubscriptionConfig.NavLogEn {
+		log.Info().Msgf("Got Measurement: %v", measurement)
+	}
 	var rawData map[string]any
 	err := json.Unmarshal(message.Payload(), &rawData)
 	if err != nil {
@@ -55,51 +65,54 @@ func OnNavigationMessage(client MQTT.Client, message MQTT.Message) {
 	}
 	nav := Navigation{}
 	nav.Source = rawData["$source"].(string)
+	if strings.Contains(nav.Source, "venus.com.victronenergy.gps.") {
+		return
+	}
 	nav.Timestamp, err = time.Parse(ISOTimeLayout, rawData["timestamp"].(string))
 	if err != nil {
 		log.Warn().Msgf("Error parsing time string: %v", err.Error())
 	}
 	switch measurement {
 	case "headingMagnetic":
-		nav.HeadingMag = rawData["value"].(float64)
+		nav.HeadingMag = RadiansToDegrees(rawData["value"].(float64))
 	case "rateOfTurn":
-		nav.ROT = rawData["value"].(float64)
+		nav.ROT = RadiansToDegrees(rawData["value"].(float64))
 	case "speedOverGround":
-		nav.SOG = rawData["value"].(float64)
+		nav.SOG = MetersPerSecondToKnots(rawData["value"].(float64))
 	case "position":
 		postmp := rawData["value"].(map[string]any)
 		nav.Lat = postmp["latitude"].(float64)
 		nav.Lat = postmp["longitude"].(float64)
 		alt, ok := postmp["altitude"].(float64)
 		if ok {
-			nav.Alt = alt
+			nav.Alt = MetersToFeet(alt)
 		}
 	case "headingTrue":
-		nav.HeadingTrue = rawData["value"].(float64)
+		nav.HeadingTrue = RadiansToDegrees(rawData["value"].(float64))
 	case "magneticVariation":
-		nav.MagVariation = rawData["value"].(float64)
+		nav.MagVariation = RadiansToDegrees(rawData["value"].(float64))
 	case "magneticDeviation":
-		nav.MagDeviation = rawData["value"].(float64)
+		nav.MagDeviation = RadiansToDegrees(rawData["value"].(float64))
 	case "datetime":
 		break
 	case "courseOverGroundTrue":
-		nav.COGTrue = rawData["value"].(float64)
+		nav.COGTrue = RadiansToDegrees(rawData["value"].(float64))
 	case "attitude":
 		atttmp := rawData["value"].(map[string]any)
 		flttmp, ok := atttmp["yaw"].(float64)
 		if ok {
-			nav.Yaw = flttmp
+			nav.Yaw = RadiansToDegrees(flttmp)
 		}
 		flttmp, ok = atttmp["pitch"].(float64)
 		if ok {
-			nav.Pitch = flttmp
+			nav.Pitch = RadiansToDegrees(flttmp)
 		}
 		flttmp, ok = atttmp["roll"].(float64)
 		if ok {
-			nav.Yaw = flttmp
+			nav.Yaw = RadiansToDegrees(flttmp)
 		}
 	case "speedThroughWater":
-		nav.STW = rawData["value"].(float64)
+		nav.STW = MetersPerSecondToKnots(rawData["value"].(float64))
 	case "speedThroughWaterReferenceType":
 		break
 	case "log":
@@ -107,9 +120,11 @@ func OnNavigationMessage(client MQTT.Client, message MQTT.Message) {
 	default:
 		log.Warn().Msgf("Unknown measurement %v in %v", measurement, message.Topic())
 	}
-	name, ok := SharedSubscriptionConfig.N2KtoName[nav.Source]
+	name, ok := SharedSubscriptionConfig.N2KtoName[strings.ToLower(nav.Source)]
 	if ok {
 		nav.Source = name
+	} else {
+		log.Warn().Msgf("Name not found for Source %v", nav.Source)
 	}
 	if nav.Timestamp.IsZero() {
 		nav.Timestamp = time.Now()
@@ -122,5 +137,8 @@ func (meas Navigation) LogJSON() {
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
 	}
-	log.Debug().Msgf("Navigation: %v", string(jsonData))
+	log.Trace().Msgf("Navigation: %v", string(jsonData))
+	if SharedSubscriptionConfig.NavLogEn {
+		log.Info().Msgf("Navigation: %v", string(jsonData))
+	}
 }
