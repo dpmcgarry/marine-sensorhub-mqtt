@@ -41,6 +41,8 @@ type SubscriptionConfig struct {
 	ESPMSHRootTopic  string
 	SignalKRootTopic string
 	CerboRootTopic   string
+	MACtoLocation    map[string]string
+	N2KtoName        map[string]string
 }
 
 type GlobalConfig struct {
@@ -148,6 +150,21 @@ func LoadSubscribeServerConfig() (SubscriptionConfig, error) {
 		} else {
 			log.Trace().Msgf("%v not found. Continuing", confItem)
 		}
+	}
+
+	if !viper.IsSet("MACtoName") {
+		log.Warn().Msg("MAC to Location Mappings not found")
+	} else {
+		log.Debug().Msg("Loading MAC to Location Mappings")
+		subConf.MACtoLocation = viper.GetStringMapString("MACtoName")
+	}
+
+	if !viper.IsSet("N2KtoName") {
+		log.Warn().Msg("N2K to Name Mappings not found")
+		return subConf, nil
+	} else {
+		log.Debug().Msg("Loading N2K to Device Name Mappings")
+		subConf.N2KtoName = viper.GetStringMapString("N2KtoName")
 	}
 
 	return subConf, nil

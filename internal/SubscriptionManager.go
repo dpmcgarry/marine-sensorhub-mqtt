@@ -65,9 +65,24 @@ func HandleSubscriptions(globalconf GlobalConfig, subscribeconf SubscriptionConf
 	addSubscription(topic, OnPHYTemperatureMessage, mqttClient)
 	topic = subscribeconf.ESPMSHRootTopic + "esp/status/#"
 	addSubscription(topic, OnESPStatusMessage, mqttClient)
+	topic = subscribeconf.SignalKRootTopic + "vessels/self/navigation/$"
+	addSubscription(topic, OnNavigationMessage, mqttClient)
+	topic = subscribeconf.SignalKRootTopic + "vessels/self/navigation/gnss/#"
+	addSubscription(topic, OnGNSSMessage, mqttClient)
+	topic = subscribeconf.SignalKRootTopic + "vessels/self/steering/#"
+	addSubscription(topic, OnSteeringMessage, mqttClient)
+	topic = subscribeconf.SignalKRootTopic + "vessels/self/environment/wind/#"
+	addSubscription(topic, OnWindMessage, mqttClient)
+	topic = subscribeconf.SignalKRootTopic + "vessels/self/environment/water/#"
+	addSubscription(topic, OnWaterMessage, mqttClient)
+	topic = subscribeconf.SignalKRootTopic + "vessels/self/environment/depth/#"
+	addSubscription(topic, OnWaterMessage, mqttClient)
+	topic = subscribeconf.SignalKRootTopic + "vessels/self/environment/outside/#"
+	addSubscription(topic, OnOutsideMessage, mqttClient)
+
 }
 
-func addSubscription(topic string, target MQTT.MessageHandler, mqttClient MQTT.Client){
+func addSubscription(topic string, target MQTT.MessageHandler, mqttClient MQTT.Client) {
 	log.Info().Msgf("Subscribing to topic: %v", topic)
 	if token := mqttClient.Subscribe(topic, byte(0), target); token.Wait() && token.Error() != nil {
 		log.Warn().Msgf("Error subscribing to topic %v with error %v", topic, token.Error())

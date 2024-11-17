@@ -25,9 +25,10 @@ import (
 )
 
 type Water struct {
-	Source string
-	TempF float64
-	Timestamp time.Time
+	Source                 string
+	TempF                  float64
+	DepthUnderTransducerFt float64
+	Timestamp              time.Time
 }
 
 func OnWaterMessage(client MQTT.Client, message MQTT.Message) {
