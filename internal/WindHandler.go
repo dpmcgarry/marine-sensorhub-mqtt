@@ -26,12 +26,12 @@ import (
 )
 
 type Wind struct {
-	Source        string
-	SpeedApp      float64
-	AngleApp      float64
-	SOG           float64
-	DirectionTrue float64
-	Timestamp     time.Time
+	Source        string    `json:"Source,omitempty"`
+	SpeedApp      float64   `json:"SpeedApp,omitempty"`
+	AngleApp      float64   `json:"AngleApp,omitempty"`
+	SOG           float64   `json:"SOG,omitempty"`
+	DirectionTrue float64   `json:"DirectionTrue,omitempty"`
+	Timestamp     time.Time `json:"Timestamp,omitempty"`
 }
 
 func OnWindMessage(client MQTT.Client, message MQTT.Message) {
@@ -58,6 +58,8 @@ func OnWindMessage(client MQTT.Client, message MQTT.Message) {
 		wind.SpeedApp = rawData["value"].(float64)
 	case "angleApparent":
 		wind.AngleApp = rawData["value"].(float64)
+	default:
+		log.Warn().Msgf("Unknown measurement %v in %v", measurement, message.Topic())
 	}
 	name, ok := SharedSubscriptionConfig.N2KtoName[wind.Source]
 	if ok {
@@ -74,5 +76,5 @@ func (meas Wind) LogJSON() {
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
 	}
-	log.Debug().Msgf("BLETemp: %v", string(jsonData))
+	log.Debug().Msgf("Wind: %v", string(jsonData))
 }

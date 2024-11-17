@@ -43,6 +43,26 @@ type SubscriptionConfig struct {
 	CerboRootTopic   string
 	MACtoLocation    map[string]string
 	N2KtoName        map[string]string
+	BLESubEn         bool
+	GNSSSubEn        bool
+	ESPSubEn         bool
+	NavSubEn         bool
+	OutsideSubEn     bool
+	PHYSubEn         bool
+	PropSubEn        bool
+	SteerSubEn       bool
+	WaterSubEn       bool
+	WindSubEn        bool
+	BLELogEn         bool
+	GNSSLogEn        bool
+	ESPLogEn         bool
+	NavLogEn         bool
+	OutsideLogEn     bool
+	PHYLogEn         bool
+	PropLogEn        bool
+	SteerLogEn       bool
+	WaterLogEn       bool
+	WindLogEn        bool
 }
 
 type GlobalConfig struct {
@@ -109,6 +129,26 @@ func LoadPublishServerConfig() ([]MQTTDestination, error) {
 
 func LoadSubscribeServerConfig() (SubscriptionConfig, error) {
 	subConf := SubscriptionConfig{}
+	subConf.BLESubEn = true
+	subConf.GNSSSubEn = true
+	subConf.ESPSubEn = true
+	subConf.NavSubEn = true
+	subConf.OutsideSubEn = true
+	subConf.PHYSubEn = true
+	subConf.PropSubEn = true
+	subConf.SteerSubEn = true
+	subConf.WaterSubEn = true
+	subConf.WindSubEn = true
+	subConf.BLELogEn = false
+	subConf.GNSSLogEn = false
+	subConf.ESPLogEn = false
+	subConf.NavLogEn = false
+	subConf.OutsideLogEn = false
+	subConf.PHYLogEn = false
+	subConf.PropLogEn = false
+	subConf.SteerLogEn = false
+	subConf.WaterLogEn = false
+	subConf.WindLogEn = false
 	if !viper.IsSet("subscription") {
 		log.Error().Msg("No Subscription Information Configured")
 		return SubscriptionConfig{}, errors.New("no subscription information set in viper config")
@@ -157,6 +197,76 @@ func LoadSubscribeServerConfig() (SubscriptionConfig, error) {
 	} else {
 		log.Debug().Msg("Loading MAC to Location Mappings")
 		subConf.MACtoLocation = viper.GetStringMapString("MACtoName")
+	}
+
+	if !viper.IsSet("EnableSubscriptions") {
+		log.Debug().Msg("Subscription overrides not found")
+		return subConf, nil
+	} else {
+		log.Debug().Msg("Subscription overrides found")
+
+		tmpmap := viper.GetStringMap("EnableSubscriptions")
+		for k, v := range tmpmap {
+			switch k {
+			case "BLE":
+				subConf.BLESubEn = v.(bool)
+			case "GNSS":
+				subConf.GNSSSubEn = v.(bool)
+			case "ESP":
+				subConf.ESPSubEn = v.(bool)
+			case "Nav":
+				subConf.NavSubEn = v.(bool)
+			case "Outside":
+				subConf.OutsideSubEn = v.(bool)
+			case "PHY":
+				subConf.PHYSubEn = v.(bool)
+			case "Propulsion":
+				subConf.PropSubEn = v.(bool)
+			case "Steering":
+				subConf.SteerSubEn = v.(bool)
+			case "Water":
+				subConf.WaterSubEn = v.(bool)
+			case "Wind":
+				subConf.WindSubEn = v.(bool)
+			default:
+				log.Warn().Msgf("Invalid Key %v found in EnableSubscriptions", k)
+			}
+		}
+	}
+
+	if !viper.IsSet("VerboseSubscriptionLogging") {
+		log.Debug().Msg("Subscription logging overrides not found")
+		return subConf, nil
+	} else {
+		log.Debug().Msg("Subscription logging overrides found")
+
+		tmpmap := viper.GetStringMap("VerboseSubscriptionLogging")
+		for k, v := range tmpmap {
+			switch k {
+			case "BLE":
+				subConf.BLELogEn = v.(bool)
+			case "GNSS":
+				subConf.GNSSLogEn = v.(bool)
+			case "ESP":
+				subConf.ESPLogEn = v.(bool)
+			case "Nav":
+				subConf.NavLogEn = v.(bool)
+			case "Outside":
+				subConf.OutsideLogEn = v.(bool)
+			case "PHY":
+				subConf.PHYLogEn = v.(bool)
+			case "Propulsion":
+				subConf.PropLogEn = v.(bool)
+			case "Steering":
+				subConf.SteerLogEn = v.(bool)
+			case "Water":
+				subConf.WaterLogEn = v.(bool)
+			case "Wind":
+				subConf.WindLogEn = v.(bool)
+			default:
+				log.Warn().Msgf("Invalid Key %v found in VerboseSubscriptionLogging", k)
+			}
+		}
 	}
 
 	if !viper.IsSet("N2KtoName") {

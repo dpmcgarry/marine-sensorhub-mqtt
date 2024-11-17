@@ -18,6 +18,7 @@ package internal
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
@@ -25,18 +26,41 @@ import (
 )
 
 type Water struct {
-	Source                 string
-	TempF                  float64
-	DepthUnderTransducerFt float64
-	Timestamp              time.Time
+	Source                 string    `json:"Source,omitempty"`
+	TempF                  float64   `json:"TempF,omitempty"`
+	DepthUnderTransducerFt float64   `json:"DepthUnderTransducerFt,omitempty"`
+	Timestamp              time.Time `json:"Timestamp,omitempty"`
 }
 
 func OnWaterMessage(client MQTT.Client, message MQTT.Message) {
 	log.Debug().Msgf("Got a message from: %v", message.Topic())
-	water := Water{}
-	err := json.Unmarshal(message.Payload(), &water)
+	measurement := message.Topic()[strings.LastIndex(message.Topic(), "/")+1:]
+	log.Debug().Msgf("Got Measurement: %v", measurement)
+	var rawData map[string]any
+	err := json.Unmarshal(message.Payload(), &rawData)
 	if err != nil {
 		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
+	}
+	water := Water{}
+	water.Source = rawData["$source"].(string)
+	water.Timestamp, err = time.Parse(ISOTimeLayout, rawData["timestamp"].(string))
+	if err != nil {
+		log.Warn().Msgf("Error parsing time string: %v", err.Error())
+	}
+	switch measurement {
+	case "temperature":
+		water.TempF = rawData["value"].(float64)
+	case "belowTransducer":
+		water.DepthUnderTransducerFt = rawData["value"].(float64)
+	default:
+		log.Warn().Msgf("Unknown measurement %v in %v", measurement, message.Topic())
+	}
+	name, ok := SharedSubscriptionConfig.N2KtoName[water.Source]
+	if ok {
+		water.Source = name
+	}
+	if water.Timestamp.IsZero() {
+		water.Timestamp = time.Now()
 	}
 	water.LogJSON()
 }
@@ -46,5 +70,5 @@ func (meas Water) LogJSON() {
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
 	}
-	log.Debug().Msgf("BLETemp: %v", string(jsonData))
+	log.Debug().Msgf("Water: %v", string(jsonData))
 }

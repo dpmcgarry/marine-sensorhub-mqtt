@@ -18,6 +18,7 @@ package internal
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
@@ -25,24 +26,60 @@ import (
 )
 
 type GNSS struct {
-	Source        string
-	AntennaAlt    float64
-	Sattelites    int64
-	HozDilution   float64
-	PosDilution   float64
-	GeoidalSep    float64
-	Type          string
-	MethodQuality string
-	SatsInView    int64
-	Timestamp     time.Time
+	Source        string    `json:"Source,omitempty"`
+	AntennaAlt    float64   `json:"AntennaAlt,omitempty"`
+	Satellites    int64     `json:"Satellites,omitempty"`
+	HozDilution   float64   `json:"HozDilution,omitempty"`
+	PosDilution   float64   `json:"PosDilution,omitempty"`
+	GeoidalSep    float64   `json:"GeoidalSep,omitempty"`
+	Type          string    `json:"Type,omitempty"`
+	MethodQuality string    `json:"MethodQuality,omitempty"`
+	Timestamp     time.Time `json:"Timestamp,omitempty"`
 }
 
 func OnGNSSMessage(client MQTT.Client, message MQTT.Message) {
 	log.Debug().Msgf("Got a message from: %v", message.Topic())
-	gnss := GNSS{}
-	err := json.Unmarshal(message.Payload(), &gnss)
+	measurement := message.Topic()[strings.LastIndex(message.Topic(), "/")+1:]
+	log.Debug().Msgf("Got Measurement: %v", measurement)
+	var rawData map[string]any
+	err := json.Unmarshal(message.Payload(), &rawData)
 	if err != nil {
 		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
+	}
+	gnss := GNSS{}
+	gnss.Source = rawData["$source"].(string)
+	gnss.Timestamp, err = time.Parse(ISOTimeLayout, rawData["timestamp"].(string))
+	if err != nil {
+		log.Warn().Msgf("Error parsing time string: %v", err.Error())
+	}
+	switch measurement {
+	case "antennaAltitude":
+		gnss.AntennaAlt = rawData["value"].(float64)
+	case "satellites":
+		gnss.Satellites = int64(rawData["value"].(float64))
+	case "horizontalDilution":
+		gnss.HozDilution = rawData["value"].(float64)
+	case "positionDilution":
+		gnss.PosDilution = rawData["value"].(float64)
+	case "geoidalSeparation":
+		gnss.GeoidalSep = rawData["value"].(float64)
+	case "type":
+		gnss.Type = rawData["value"].(string)
+	case "methodQuality":
+		gnss.MethodQuality = rawData["value"].(string)
+	case "integrity":
+		break
+	case "satellitesInView":
+		break
+	default:
+		log.Warn().Msgf("Unknown measurement %v in %v", measurement, message.Topic())
+	}
+	name, ok := SharedSubscriptionConfig.N2KtoName[gnss.Source]
+	if ok {
+		gnss.Source = name
+	}
+	if gnss.Timestamp.IsZero() {
+		gnss.Timestamp = time.Now()
 	}
 	gnss.LogJSON()
 }
@@ -52,5 +89,5 @@ func (meas GNSS) LogJSON() {
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
 	}
-	log.Debug().Msgf("BLETemp: %v", string(jsonData))
+	log.Debug().Msgf("GNSS: %v", string(jsonData))
 }

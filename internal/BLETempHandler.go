@@ -25,13 +25,13 @@ import (
 )
 
 type BLETemperature struct {
-	MAC            string
-	Location       string `json:"Location,omitempty"`
-	TempF          float64
-	BatteryPercent float64 `json:"BatteryPct,omitempty"`
-	Humidity       float64 `json:"Humidity,omitempty"`
-	RSSI           int64
-	Timestamp      time.Time
+	MAC            string    `json:"MAC,omitempty"`
+	Location       string    `json:"Location,omitempty"`
+	TempF          float64   `json:"TempF,omitempty"`
+	BatteryPercent float64   `json:"BatteryPct,omitempty"`
+	Humidity       float64   `json:"Humidity,omitempty"`
+	RSSI           int64     `json:"RSSI,omitempty"`
+	Timestamp      time.Time `json:"Timestamp,omitempty"`
 }
 
 func OnBLETemperatureMessage(client MQTT.Client, message MQTT.Message) {

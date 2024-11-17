@@ -25,21 +25,21 @@ import (
 )
 
 type ESPStatus struct {
-	MAC                string
-	Location           string `json:"Location,omitempty"`
-	IPAddress          string
-	MSHVersion         string
-	FreeSRAM           int64 `json:"FreeSRAM,omitempty"`
-	FreeHeap           int64 `json:"FreeHeap,omitempty"`
-	FreePSRAM          int64 `json:"FreePSRAM,omitempty"`
-	WiFiReconnectCount int64
-	MQTTReconnectCount int64
-	BLEEnabled         bool
-	RTDEnabled         bool
-	WiFiRSSI           int64
-	HasTime            bool
-	MasResetMQTT       bool
-	Timestamp          time.Time
+	MAC                string    `json:"MAC,omitempty"`
+	Location           string    `json:"Location,omitempty"`
+	IPAddress          string    `json:"IPAddress,omitempty"`
+	MSHVersion         string    `json:"MSHVersion,omitempty"`
+	FreeSRAM           int64     `json:"FreeSRAM,omitempty"`
+	FreeHeap           int64     `json:"FreeHeap,omitempty"`
+	FreePSRAM          int64     `json:"FreePSRAM,omitempty"`
+	WiFiReconnectCount int64     `json:"WiFiReconnectCount,omitempty"`
+	MQTTReconnectCount int64     `json:"MQTTReconnectCount,omitempty"`
+	BLEEnabled         bool      `json:"BLEEnabled,omitempty"`
+	RTDEnabled         bool      `json:"RTDEnabled,omitempty"`
+	WiFiRSSI           int64     `json:"WiFiRSSI,omitempty"`
+	HasTime            bool      `json:"HasTime,omitempty"`
+	HasResetMQTT       bool      `json:"HasResetMQTT,omitempty"`
+	Timestamp          time.Time `json:"Timestamp,omitempty"`
 }
 
 func OnESPStatusMessage(client MQTT.Client, message MQTT.Message) {
@@ -66,5 +66,5 @@ func (meas ESPStatus) LogJSON() {
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
 	}
-	log.Debug().Msgf("BLETemp: %v", string(jsonData))
+	log.Debug().Msgf("ESP Status: %v", string(jsonData))
 }

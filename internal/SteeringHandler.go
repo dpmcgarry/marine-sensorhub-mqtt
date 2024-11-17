@@ -18,6 +18,7 @@ package internal
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
@@ -25,19 +26,48 @@ import (
 )
 
 type Steering struct {
-	Source           string
-	RudderAngle      float64
-	AutopilotState   string
-	TargetHeadingMag float64
-	Timestamp        time.Time
+	Source           string    `json:"Source,omitempty"`
+	RudderAngle      float64   `json:"RudderAngle,omitempty"`
+	AutopilotState   string    `json:"AutoPilotState,omitempty"`
+	TargetHeadingMag float64   `json:"TargetHeading,omitempty"`
+	Timestamp        time.Time `json:"Timestamp,omitempty"`
 }
 
 func OnSteeringMessage(client MQTT.Client, message MQTT.Message) {
 	log.Debug().Msgf("Got a message from: %v", message.Topic())
-	steer := Steering{}
-	err := json.Unmarshal(message.Payload(), &steer)
+	measurement := message.Topic()[strings.LastIndex(message.Topic(), "/")+1:]
+	log.Debug().Msgf("Got Measurement: %v", measurement)
+	var rawData map[string]any
+	err := json.Unmarshal(message.Payload(), &rawData)
 	if err != nil {
 		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
+	}
+	steer := Steering{}
+	steer.Source = rawData["$source"].(string)
+	steer.Timestamp, err = time.Parse(ISOTimeLayout, rawData["timestamp"].(string))
+	if err != nil {
+		log.Warn().Msgf("Error parsing time string: %v", err.Error())
+	}
+	switch measurement {
+	case "rudderAngle":
+		steer.RudderAngle = rawData["value"].(float64)
+	case "autopilot":
+		break
+	case "state":
+		steer.AutopilotState = rawData["value"].(string)
+	case "target":
+		break
+	case "headingMagnetic":
+		steer.TargetHeadingMag = rawData["value"].(float64)
+	default:
+		log.Warn().Msgf("Unknown measurement %v in %v", measurement, message.Topic())
+	}
+	name, ok := SharedSubscriptionConfig.N2KtoName[steer.Source]
+	if ok {
+		steer.Source = name
+	}
+	if steer.Timestamp.IsZero() {
+		steer.Timestamp = time.Now()
 	}
 	steer.LogJSON()
 }
@@ -47,5 +77,5 @@ func (meas Steering) LogJSON() {
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
 	}
-	log.Debug().Msgf("BLETemp: %v", string(jsonData))
+	log.Debug().Msgf("Steering: %v", string(jsonData))
 }

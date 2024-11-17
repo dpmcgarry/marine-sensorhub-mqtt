@@ -1,6 +1,6 @@
 # marine-sensorhub-mqtt
 
-Go Daemon to process MQTT messages from Marine Sensorhub
+Go Daemon to process MQTT messages from Marine Sensorhub / SignalK / Victron Cerbo
 
 [![CircleCI](https://dl.circleci.com/status-badge/img/circleci/BAoeA8hPhLZPsitWVrJzUa/R3FbSRfu28FC3tEmqFMr83/tree/main.svg?style=shield)](https://dl.circleci.com/status-badge/redirect/circleci/BAoeA8hPhLZPsitWVrJzUa/R3FbSRfu28FC3tEmqFMr83/tree/main)
 
@@ -22,3 +22,15 @@ Ref: <https://docs.influxdata.com/influxdb/v2/write-data/best-practices/schema-d
 | propulsion | Device, Source | RPM, BoostPSI, OilTempF, OilPressure, CoolanltTempF, RunTime, EngineLoad, EngineTorque, TransOilTempF, TransOilPressure |
 
 TBD: Notifications
+
+## TODO
+
+* Add logging overrides
+* Cleanup MAC / N2K in Global and Subscription
+* Unit tests
+* Change Handlers to Async
+* Add InfluxDB
+* Add MQTT Repost
+* Look at trimming down number of items
+* Handle Unit Conversions
+* Look at having two log files (Warn+ and Info/Debug)

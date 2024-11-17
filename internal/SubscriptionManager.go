@@ -63,26 +63,48 @@ func HandleSubscriptions(globalconf GlobalConfig, subscribeconf SubscriptionConf
 		return
 	}
 
-	topic := subscribeconf.ESPMSHRootTopic + "ble/temperature/#"
-	addSubscription(topic, OnBLETemperatureMessage, mqttClient)
-	// topic = subscribeconf.ESPMSHRootTopic + "rtd/temperature/#"
-	// addSubscription(topic, OnPHYTemperatureMessage, mqttClient)
-	// topic = subscribeconf.ESPMSHRootTopic + "esp/status/#"
-	// addSubscription(topic, OnESPStatusMessage, mqttClient)
-	// topic = subscribeconf.SignalKRootTopic + "vessels/self/navigation/$"
-	// addSubscription(topic, OnNavigationMessage, mqttClient)
-	// topic = subscribeconf.SignalKRootTopic + "vessels/self/navigation/gnss/#"
-	// addSubscription(topic, OnGNSSMessage, mqttClient)
-	// topic = subscribeconf.SignalKRootTopic + "vessels/self/steering/#"
-	// addSubscription(topic, OnSteeringMessage, mqttClient)
-	topic = subscribeconf.SignalKRootTopic + "vessels/self/environment/wind/#"
-	addSubscription(topic, OnWindMessage, mqttClient)
-	// topic = subscribeconf.SignalKRootTopic + "vessels/self/environment/water/#"
-	// addSubscription(topic, OnWaterMessage, mqttClient)
-	// topic = subscribeconf.SignalKRootTopic + "vessels/self/environment/depth/#"
-	// addSubscription(topic, OnWaterMessage, mqttClient)
-	// topic = subscribeconf.SignalKRootTopic + "vessels/self/environment/outside/#"
-	// addSubscription(topic, OnOutsideMessage, mqttClient)
+	if subscribeconf.BLESubEn {
+		topic := subscribeconf.ESPMSHRootTopic + "ble/temperature/#"
+		addSubscription(topic, OnBLETemperatureMessage, mqttClient)
+	}
+	if subscribeconf.PHYSubEn {
+		topic := subscribeconf.ESPMSHRootTopic + "rtd/temperature/#"
+		addSubscription(topic, OnPHYTemperatureMessage, mqttClient)
+	}
+	if subscribeconf.ESPSubEn {
+		topic := subscribeconf.ESPMSHRootTopic + "esp/status/#"
+		addSubscription(topic, OnESPStatusMessage, mqttClient)
+	}
+	if subscribeconf.NavSubEn {
+		topic := subscribeconf.SignalKRootTopic + "vessels/self/navigation/+"
+		addSubscription(topic, OnNavigationMessage, mqttClient)
+	}
+	if subscribeconf.GNSSSubEn {
+		topic := subscribeconf.SignalKRootTopic + "vessels/self/navigation/gnss/#"
+		addSubscription(topic, OnGNSSMessage, mqttClient)
+	}
+	if subscribeconf.SteerSubEn {
+		topic := subscribeconf.SignalKRootTopic + "vessels/self/steering/#"
+		addSubscription(topic, OnSteeringMessage, mqttClient)
+	}
+	if subscribeconf.WindSubEn {
+		topic := subscribeconf.SignalKRootTopic + "vessels/self/environment/wind/#"
+		addSubscription(topic, OnWindMessage, mqttClient)
+	}
+	if subscribeconf.WaterSubEn {
+		topic := subscribeconf.SignalKRootTopic + "vessels/self/environment/water/#"
+		addSubscription(topic, OnWaterMessage, mqttClient)
+		topic = subscribeconf.SignalKRootTopic + "vessels/self/environment/depth/#"
+		addSubscription(topic, OnWaterMessage, mqttClient)
+	}
+	if subscribeconf.OutsideSubEn {
+		topic := subscribeconf.SignalKRootTopic + "vessels/self/environment/outside/#"
+		addSubscription(topic, OnOutsideMessage, mqttClient)
+	}
+	if subscribeconf.PropSubEn {
+		topic := subscribeconf.SignalKRootTopic + "vessels/self/propulsion/#"
+		addSubscription(topic, OnPropulsionMessage, mqttClient)
+	}
 
 }
 

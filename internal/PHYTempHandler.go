@@ -25,12 +25,12 @@ import (
 )
 
 type PHYTemperature struct {
-	MAC       string
-	Location  string `json:"Location,omitempty"`
-	Device    string `json:"Device,omitempty"`
-	Component string `json:"Component,omitempty"`
-	TempF     float64
-	Timestamp time.Time
+	MAC       string    `json:"MAC,omitempty"`
+	Location  string    `json:"Location,omitempty"`
+	Device    string    `json:"Device,omitempty"`
+	Component string    `json:"Component,omitempty"`
+	TempF     float64   `json:"TempF,omitempty"`
+	Timestamp time.Time `json:"Timestamp,omitempty"`
 }
 
 func OnPHYTemperatureMessage(client MQTT.Client, message MQTT.Message) {
@@ -55,5 +55,5 @@ func (meas PHYTemperature) LogJSON() {
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
 	}
-	log.Debug().Msgf("BLETemp: %v", string(jsonData))
+	log.Debug().Msgf("Physical Temp: %v", string(jsonData))
 }
