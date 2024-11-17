@@ -7,7 +7,7 @@ jobs:
       AWS_REGION: us-east-1
       PACKAGE_BASE_VERSION: 1.0.
     docker:
-      - image: cimg/go:1.23.1
+      - image: cimg/go:1.23.3
     resource_class: dizon/onprem
     steps:
       - checkout
@@ -73,8 +73,6 @@ jobs:
             cat ~/project/deb/marine-sensorhub-mqtt/DEBIAN/control
             cp ~/build/amd64/marine-sensorhub-mqtt ~/project/deb/marine-sensorhub-mqtt/usr/local/bin/marine-sensorhub-mqtt
             cd ~/project/deb
-            rm ./marine-sensorhub-mqtt/DEBIAN/.gitkeep
-            rm ./marine-sensorhub-mqtt/usr/local/bin/.gitkeep
             dpkg-deb --build marine-sensorhub-mqtt
             ls
             cp marine-sensorhub-mqtt.deb ~/artifacts/marine-sensorhub-mqtt_${PACKAGE_BASE_VERSION}${CIRCLE_BUILD_NUM}_amd64.deb
