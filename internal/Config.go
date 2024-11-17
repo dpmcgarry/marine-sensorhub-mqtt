@@ -41,14 +41,69 @@ type SubscriptionConfig struct {
 	ESPMSHRootTopic  string
 	SignalKRootTopic string
 	CerboRootTopic   string
+	MACtoLocation    map[string]string
+	N2KtoName        map[string]string
+	BLESubEn         bool
+	GNSSSubEn        bool
+	ESPSubEn         bool
+	NavSubEn         bool
+	OutsideSubEn     bool
+	PHYSubEn         bool
+	PropSubEn        bool
+	SteerSubEn       bool
+	WaterSubEn       bool
+	WindSubEn        bool
+	BLELogEn         bool
+	GNSSLogEn        bool
+	ESPLogEn         bool
+	NavLogEn         bool
+	OutsideLogEn     bool
+	PHYLogEn         bool
+	PropLogEn        bool
+	SteerLogEn       bool
+	WaterLogEn       bool
+	WindLogEn        bool
 }
 
-type GlobalConfig struct {
+type PublishConfig struct {
 	Interval          int
 	PublishTimeout    int
 	DisconnectTimeout int
-	MACtoName         map[string]string
-	N2KtoName         map[string]string
+}
+
+func LoadPublishConfig() (PublishConfig, error) {
+	publishConf := PublishConfig{}
+	if !viper.IsSet("publish.interval") {
+		log.Error().Msg("Interval not configured")
+		return PublishConfig{}, errors.New("interval not set")
+	}
+	publishConf.Interval = viper.GetInt("publish.interval")
+	if !(publishConf.Interval > 0) {
+		log.Error().Msgf("Interval set to invalid value: %v", publishConf.Interval)
+		return PublishConfig{}, fmt.Errorf("interval set to invalid value %v", publishConf.Interval)
+	}
+	log.Debug().Msgf("Interval Set to: %v", publishConf.Interval)
+	if !viper.IsSet("publish.timeout") {
+		log.Error().Msg("Publish Timeout not configured")
+		return PublishConfig{}, errors.New("publishtimeout not set")
+	}
+	publishConf.PublishTimeout = viper.GetInt("publish.timeout")
+	if !(publishConf.PublishTimeout > 0) {
+		log.Error().Msgf("Publish Timeout set to invalid value: %v", publishConf.PublishTimeout)
+		return PublishConfig{}, fmt.Errorf("publishtimeout set to invalid value %v", publishConf.PublishTimeout)
+	}
+	log.Debug().Msgf("Publish Timeout Set to: %v", publishConf.PublishTimeout)
+	if !viper.IsSet("publish.disconnecttimeout") {
+		log.Error().Msg("Disconnect Timeout not configured")
+		return PublishConfig{}, errors.New("disconnecttimeout not set")
+	}
+	publishConf.DisconnectTimeout = viper.GetInt("publish.disconnecttimeout")
+	if !(publishConf.DisconnectTimeout > 0) {
+		log.Error().Msgf("Disconnect Timeout set to invalid value: %v", publishConf.DisconnectTimeout)
+		return PublishConfig{}, fmt.Errorf("disconnecttimeout set to invalid value %v", publishConf.DisconnectTimeout)
+	}
+	log.Debug().Msgf("Disconnect Timeout Set to: %v", publishConf.DisconnectTimeout)
+	return publishConf, nil
 }
 
 func LoadPublishServerConfig() ([]MQTTDestination, error) {
@@ -107,6 +162,26 @@ func LoadPublishServerConfig() ([]MQTTDestination, error) {
 
 func LoadSubscribeServerConfig() (SubscriptionConfig, error) {
 	subConf := SubscriptionConfig{}
+	subConf.BLESubEn = true
+	subConf.GNSSSubEn = true
+	subConf.ESPSubEn = true
+	subConf.NavSubEn = true
+	subConf.OutsideSubEn = true
+	subConf.PHYSubEn = true
+	subConf.PropSubEn = true
+	subConf.SteerSubEn = true
+	subConf.WaterSubEn = true
+	subConf.WindSubEn = true
+	subConf.BLELogEn = false
+	subConf.GNSSLogEn = false
+	subConf.ESPLogEn = false
+	subConf.NavLogEn = false
+	subConf.OutsideLogEn = false
+	subConf.PHYLogEn = false
+	subConf.PropLogEn = false
+	subConf.SteerLogEn = false
+	subConf.WaterLogEn = false
+	subConf.WindLogEn = false
 	if !viper.IsSet("subscription") {
 		log.Error().Msg("No Subscription Information Configured")
 		return SubscriptionConfig{}, errors.New("no subscription information set in viper config")
@@ -150,50 +225,90 @@ func LoadSubscribeServerConfig() (SubscriptionConfig, error) {
 		}
 	}
 
-	return subConf, nil
-}
+	if !viper.IsSet("MACtoName") {
+		log.Warn().Msg("MAC to Location Mappings not found")
+	} else {
+		log.Debug().Msg("Loading MAC to Location Mappings")
+		subConf.MACtoLocation = viper.GetStringMapString("MACtoName")
+	}
 
-func LoadGlobalConfig() (GlobalConfig, error) {
-	globalConf := GlobalConfig{}
-	if !viper.IsSet("publishinterval") {
-		log.Error().Msg("Interval not configured")
-		return GlobalConfig{}, errors.New("interval not set")
+	if !viper.IsSet("EnableSubscriptions") {
+		log.Debug().Msg("Subscription overrides not found")
+		return subConf, nil
+	} else {
+		log.Debug().Msg("Subscription overrides found")
+
+		tmpmap := viper.GetStringMap("EnableSubscriptions")
+		for k, v := range tmpmap {
+			switch k {
+			case "ble":
+				subConf.BLESubEn = v.(bool)
+			case "gnss":
+				subConf.GNSSSubEn = v.(bool)
+			case "esp":
+				subConf.ESPSubEn = v.(bool)
+			case "nav":
+				subConf.NavSubEn = v.(bool)
+			case "outside":
+				subConf.OutsideSubEn = v.(bool)
+			case "phy":
+				subConf.PHYSubEn = v.(bool)
+			case "propulsion":
+				subConf.PropSubEn = v.(bool)
+			case "steering":
+				subConf.SteerSubEn = v.(bool)
+			case "water":
+				subConf.WaterSubEn = v.(bool)
+			case "wind":
+				subConf.WindSubEn = v.(bool)
+			default:
+				log.Warn().Msgf("Invalid Key %v found in EnableSubscriptions", k)
+			}
+		}
 	}
-	globalConf.Interval = viper.GetInt("publishinterval")
-	if !(globalConf.Interval > 0) {
-		log.Error().Msgf("Interval set to invalid value: %v", globalConf.Interval)
-		return GlobalConfig{}, fmt.Errorf("interval set to invalid value %v", globalConf.Interval)
+
+	if !viper.IsSet("VerboseSubscriptionLogging") {
+		log.Debug().Msg("Subscription logging overrides not found")
+		return subConf, nil
+	} else {
+		log.Debug().Msg("Subscription logging overrides found")
+
+		tmpmap := viper.GetStringMap("VerboseSubscriptionLogging")
+		for k, v := range tmpmap {
+			switch k {
+			case "ble":
+				subConf.BLELogEn = v.(bool)
+			case "gnss":
+				subConf.GNSSLogEn = v.(bool)
+			case "esp":
+				subConf.ESPLogEn = v.(bool)
+			case "nav":
+				subConf.NavLogEn = v.(bool)
+			case "outside":
+				subConf.OutsideLogEn = v.(bool)
+			case "phy":
+				subConf.PHYLogEn = v.(bool)
+			case "propulsion":
+				subConf.PropLogEn = v.(bool)
+			case "steering":
+				subConf.SteerLogEn = v.(bool)
+			case "water":
+				subConf.WaterLogEn = v.(bool)
+			case "wind":
+				subConf.WindLogEn = v.(bool)
+			default:
+				log.Warn().Msgf("Invalid Key %v found in VerboseSubscriptionLogging", k)
+			}
+		}
 	}
-	log.Debug().Msgf("Interval Set to: %v", globalConf.Interval)
-	if !viper.IsSet("publishtimeout") {
-		log.Error().Msg("Publish Timeout not configured")
-		return GlobalConfig{}, errors.New("publishtimeout not set")
+
+	if !viper.IsSet("N2KtoName") {
+		log.Warn().Msg("N2K to Name Mappings not found")
+		return subConf, nil
+	} else {
+		log.Debug().Msg("Loading N2K to Device Name Mappings")
+		subConf.N2KtoName = viper.GetStringMapString("N2KtoName")
 	}
-	globalConf.PublishTimeout = viper.GetInt("publishtimeout")
-	if !(globalConf.PublishTimeout > 0) {
-		log.Error().Msgf("Publish Timeout set to invalid value: %v", globalConf.PublishTimeout)
-		return GlobalConfig{}, fmt.Errorf("publishtimeout set to invalid value %v", globalConf.PublishTimeout)
-	}
-	log.Debug().Msgf("Publish Timeout Set to: %v", globalConf.PublishTimeout)
-	if !viper.IsSet("disconnecttimeout") {
-		log.Error().Msg("Disconnect Timeout not configured")
-		return GlobalConfig{}, errors.New("disconnecttimeout not set")
-	}
-	globalConf.DisconnectTimeout = viper.GetInt("disconnecttimeout")
-	if !(globalConf.DisconnectTimeout > 0) {
-		log.Error().Msgf("Disconnect Timeout set to invalid value: %v", globalConf.DisconnectTimeout)
-		return GlobalConfig{}, fmt.Errorf("disconnecttimeout set to invalid value %v", globalConf.DisconnectTimeout)
-	}
-	log.Debug().Msgf("Disconnect Timeout Set to: %v", globalConf.DisconnectTimeout)
-	if viper.IsSet("MACtoName") {
-		log.Debug().Msg("Loading MAC Address mapping to name")
-		globalConf.MACtoName = viper.GetStringMapString("MACtoName")
-		log.Debug().Msgf("Got %v MAC to Name mappings", len(globalConf.MACtoName))
-	}
-	if viper.IsSet("N2KtoName") {
-		log.Debug().Msg("Loading NMEA 2k mapping to name")
-		globalConf.N2KtoName = viper.GetStringMapString("N2KtoName")
-		log.Debug().Msgf("Got %v NMEA to Name mappings", len(globalConf.N2KtoName))
-	}
-	return globalConf, nil
+
+	return subConf, nil
 }

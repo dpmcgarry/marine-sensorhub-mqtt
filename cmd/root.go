@@ -26,11 +26,13 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:   "marine-sensorhub-mqtt",
-	Short: "Sends MQTT Messages as a keepalive",
-	Long: `Certain MQTT servers such as the Victron Cerbo and SignalK
-require an empty MQTT message sent to a specific topic to keep the
-server alive. This program is intended as a simple daemon to send those
-messages.`,
+	Short: "MQTT Middleware for Marine SensorHub",
+	Long: `Performs some middleware operations for 
+Marine Sensorhub. This CLI can publish the keepalive
+MQTT messages needed by Victron and others to enable
+MQTT publishing in their integrated servers. This CLI
+also handles receiving these messages and processing
+them into a normalized format for storage and display.`,
 }
 
 func Execute() {

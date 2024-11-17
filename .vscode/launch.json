@@ -18,7 +18,7 @@
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}",
-            "args": ["sub", "-d"]
+            "args": ["sub"]
         }
     ]
 }
