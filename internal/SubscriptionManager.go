@@ -57,6 +57,7 @@ func HandleSubscriptions(subscribeconf SubscriptionConfig) {
 		mqttOpts.SetTLSConfig(tlsConfig)
 		log.Debug().Msg("Configured TLS")
 	}
+	mqttOpts.AutoReconnect = true
 	mqttClient := MQTT.NewClient(mqttOpts)
 	if token := mqttClient.Connect(); token.Wait() && token.Error() != nil {
 		log.Warn().Msgf("Error Connecting to host: %v", token.Error())

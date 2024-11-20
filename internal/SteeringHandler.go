@@ -34,10 +34,10 @@ type Steering struct {
 }
 
 func OnSteeringMessage(client MQTT.Client, message MQTT.Message) {
-	go handleSteeringMessage(message)
+	go handleSteeringMessage(client, message)
 }
 
-func handleSteeringMessage(message MQTT.Message) {
+func handleSteeringMessage(client MQTT.Client, message MQTT.Message) {
 	log.Trace().Msgf("Got a message from: %v", message.Topic())
 	if SharedSubscriptionConfig.SteerLogEn {
 		log.Info().Msgf("Got a message from: %v", message.Topic())
@@ -81,16 +81,39 @@ func handleSteeringMessage(message MQTT.Message) {
 	if steer.Timestamp.IsZero() {
 		steer.Timestamp = time.Now()
 	}
-	steer.LogJSON()
+	if !steer.IsEmpty() {
+		steer.LogJSON()
+		if SharedSubscriptionConfig.Repost {
+			if measurement == "state" {
+				measurement = "autopilotState"
+			}
+			PublishClientMessage(client,
+				SharedSubscriptionConfig.RepostRootTopic+"vessel/steering/"+steer.Source+"/"+measurement, steer.ToJSON())
+		}
+	}
 }
 
-func (meas Steering) LogJSON() {
+func (meas Steering) ToJSON() string {
 	jsonData, err := json.Marshal(meas)
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
 	}
-	log.Trace().Msgf("Steering: %v", string(jsonData))
+	return string(jsonData)
+}
+
+func (meas Steering) LogJSON() {
+	json := meas.ToJSON()
+	log.Trace().Msgf("Steering: %v", json)
 	if SharedSubscriptionConfig.SteerLogEn {
-		log.Info().Msgf("Steering: %v", string(jsonData))
+		log.Info().Msgf("Steering: %v", json)
 	}
+}
+
+// Since we are dropping fields we can end up with messages that are just a Source and a Timestamp
+// This allows us to drop those messages
+func (meas Steering) IsEmpty() bool {
+	if meas.RudderAngle == 0.0 && meas.AutopilotState == "" && meas.TargetHeadingMag == 0.0 {
+		return true
+	}
+	return false
 }

@@ -35,10 +35,10 @@ type Wind struct {
 }
 
 func OnWindMessage(client MQTT.Client, message MQTT.Message) {
-	go handleWindMessage(message)
+	go handleWindMessage(client, message)
 }
 
-func handleWindMessage(message MQTT.Message) {
+func handleWindMessage(client MQTT.Client, message MQTT.Message) {
 	log.Trace().Msgf("Got a message from: %v", message.Topic())
 	if SharedSubscriptionConfig.WindLogEn {
 		log.Info().Msgf("Got a message from: %v", message.Topic())
@@ -80,16 +80,36 @@ func handleWindMessage(message MQTT.Message) {
 	if wind.Timestamp.IsZero() {
 		wind.Timestamp = time.Now()
 	}
-	wind.LogJSON()
+	if !wind.IsEmpty() {
+		wind.LogJSON()
+		if SharedSubscriptionConfig.Repost {
+			PublishClientMessage(client,
+				SharedSubscriptionConfig.RepostRootTopic+"vessel/environment/wind/"+wind.Source+"/"+measurement, wind.ToJSON())
+		}
+	}
 }
 
-func (meas Wind) LogJSON() {
+func (meas Wind) ToJSON() string {
 	jsonData, err := json.Marshal(meas)
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
 	}
-	log.Trace().Msgf("Wind: %v", string(jsonData))
+	return string(jsonData)
+}
+
+func (meas Wind) LogJSON() {
+	json := meas.ToJSON()
+	log.Trace().Msgf("Wind: %v", json)
 	if SharedSubscriptionConfig.WindLogEn {
-		log.Info().Msgf("Wind: %v", string(jsonData))
+		log.Info().Msgf("Wind: %v", json)
 	}
+}
+
+// Since we are dropping fields we can end up with messages that are just a Source and a Timestamp
+// This allows us to drop those messages
+func (meas Wind) IsEmpty() bool {
+	if meas.SpeedApp == 0.0 && meas.AngleApp == 0.0 && meas.SOG == 0.0 && meas.DirectionTrue == 0.0 {
+		return true
+	}
+	return false
 }

@@ -68,3 +68,10 @@ func PublishMessage(publishConf PublishConfig, serverConf MQTTDestination) {
 	}
 	client.Disconnect(uint(publishConf.DisconnectTimeout))
 }
+
+func PublishClientMessage(client MQTT.Client, topic string, messagedata string) {
+	log.Trace().Msgf("Will publish to topic: %v", topic)
+	log.Trace().Msgf("Will publish message: %v", messagedata)
+	token := client.Publish(topic, byte(0), false, messagedata)
+	token.WaitTimeout(time.Duration(SharedSubscriptionConfig.PublishTimeout) * time.Millisecond)
+}

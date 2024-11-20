@@ -44,10 +44,10 @@ type ESPStatus struct {
 }
 
 func OnESPStatusMessage(client MQTT.Client, message MQTT.Message) {
-	go handleESPStatusMessage(message)
+	go handleESPStatusMessage(client, message)
 }
 
-func handleESPStatusMessage(message MQTT.Message) {
+func handleESPStatusMessage(client MQTT.Client, message MQTT.Message) {
 	log.Trace().Msgf("Got a message from: %v", message.Topic())
 	if SharedSubscriptionConfig.ESPLogEn {
 		log.Info().Msgf("Got a message from: %v", message.Topic())
@@ -69,15 +69,23 @@ func handleESPStatusMessage(message MQTT.Message) {
 	}
 
 	espStatus.LogJSON()
+	if SharedSubscriptionConfig.Repost {
+		PublishClientMessage(client, SharedSubscriptionConfig.RepostRootTopic+"esp/status/"+espStatus.Location, espStatus.ToJSON())
+	}
 }
 
-func (meas ESPStatus) LogJSON() {
+func (meas ESPStatus) ToJSON() string {
 	jsonData, err := json.Marshal(meas)
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
 	}
-	log.Trace().Msgf("ESP Status: %v", string(jsonData))
+	return string(jsonData)
+}
+
+func (meas ESPStatus) LogJSON() {
+	json := meas.ToJSON()
+	log.Trace().Msgf("ESP Status: %v", json)
 	if SharedSubscriptionConfig.ESPLogEn {
-		log.Info().Msgf("ESP Status: %v", string(jsonData))
+		log.Info().Msgf("ESP Status: %v", json)
 	}
 }

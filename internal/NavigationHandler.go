@@ -45,10 +45,10 @@ type Navigation struct {
 }
 
 func OnNavigationMessage(client MQTT.Client, message MQTT.Message) {
-	go handleNavigationMessage(message)
+	go handleNavigationMessage(client, message)
 }
 
-func handleNavigationMessage(message MQTT.Message) {
+func handleNavigationMessage(client MQTT.Client, message MQTT.Message) {
 	log.Trace().Msgf("Got a message from: %v", message.Topic())
 	if SharedSubscriptionConfig.NavLogEn {
 		log.Info().Msgf("Got a message from: %v", message.Topic())
@@ -129,7 +129,21 @@ func handleNavigationMessage(message MQTT.Message) {
 	if nav.Timestamp.IsZero() {
 		nav.Timestamp = time.Now()
 	}
-	nav.LogJSON()
+	if !nav.IsEmpty() {
+		nav.LogJSON()
+		if SharedSubscriptionConfig.Repost {
+			PublishClientMessage(client,
+				SharedSubscriptionConfig.RepostRootTopic+"vessel/navigation/"+nav.Source+"/"+measurement, nav.ToJSON())
+		}
+	}
+}
+
+func (meas Navigation) ToJSON() string {
+	jsonData, err := json.Marshal(meas)
+	if err != nil {
+		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
+	}
+	return string(jsonData)
 }
 
 func (meas Navigation) LogJSON() {
@@ -141,4 +155,15 @@ func (meas Navigation) LogJSON() {
 	if SharedSubscriptionConfig.NavLogEn {
 		log.Info().Msgf("Navigation: %v", string(jsonData))
 	}
+}
+
+// Since we are dropping fields we can end up with messages that are just a Source and a Timestamp
+// This allows us to drop those messages
+func (meas Navigation) IsEmpty() bool {
+	if meas.Lat == 0.0 && meas.Lon == 0.0 && meas.Alt == 0.0 && meas.SOG == 0.0 && meas.ROT == 0.0 && meas.COGTrue == 0.0 &&
+		meas.HeadingMag == 0.0 && meas.MagVariation == 0.0 && meas.MagDeviation == 0.0 && meas.Yaw == 0.0 &&
+		meas.Pitch == 0.0 && meas.Roll == 0.0 && meas.HeadingTrue == 0.0 && meas.STW == 0.0 {
+		return true
+	}
+	return false
 }

@@ -38,10 +38,10 @@ type GNSS struct {
 }
 
 func OnGNSSMessage(client MQTT.Client, message MQTT.Message) {
-	go handleGNSSMessage(message)
+	go handleGNSSMessage(client, message)
 }
 
-func handleGNSSMessage(message MQTT.Message) {
+func handleGNSSMessage(client MQTT.Client, message MQTT.Message) {
 	log.Trace().Msgf("Got a message from: %v", message.Topic())
 	if SharedSubscriptionConfig.GNSSLogEn {
 		log.Info().Msgf("Got a message from: %v", message.Topic())
@@ -93,16 +93,37 @@ func handleGNSSMessage(message MQTT.Message) {
 	if gnss.Timestamp.IsZero() {
 		gnss.Timestamp = time.Now()
 	}
-	gnss.LogJSON()
+	if !gnss.IsEmpty() {
+		gnss.LogJSON()
+		if SharedSubscriptionConfig.Repost {
+			PublishClientMessage(client,
+				SharedSubscriptionConfig.RepostRootTopic+"vessel/gnss/"+gnss.Source+"/"+measurement, gnss.ToJSON())
+		}
+	}
 }
 
-func (meas GNSS) LogJSON() {
+func (meas GNSS) ToJSON() string {
 	jsonData, err := json.Marshal(meas)
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
 	}
-	log.Trace().Msgf("GNSS: %v", string(jsonData))
+	return string(jsonData)
+}
+
+func (meas GNSS) LogJSON() {
+	json := meas.ToJSON()
+	log.Trace().Msgf("GNSS: %v", json)
 	if SharedSubscriptionConfig.GNSSLogEn {
-		log.Info().Msgf("GNSS: %v", string(jsonData))
+		log.Info().Msgf("GNSS: %v", json)
 	}
+}
+
+// Since we are dropping fields we can end up with messages that are just a Source and a Timestamp
+// This allows us to drop those messages
+func (meas GNSS) IsEmpty() bool {
+	if meas.AntennaAlt == 0.0 && meas.Satellites == 0 && meas.HozDilution == 0.0 && meas.PosDilution == 0.0 &&
+		meas.GeoidalSep == 0.0 && meas.Type == "" && meas.MethodQuality == "" {
+		return true
+	}
+	return false
 }

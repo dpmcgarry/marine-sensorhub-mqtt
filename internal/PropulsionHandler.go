@@ -44,10 +44,10 @@ type Propulsion struct {
 }
 
 func OnPropulsionMessage(client MQTT.Client, message MQTT.Message) {
-	go handlePropulsionMessage(message)
+	go handlePropulsionMessage(client, message)
 }
 
-func handlePropulsionMessage(message MQTT.Message) {
+func handlePropulsionMessage(client MQTT.Client, message MQTT.Message) {
 	// TODO: Support Multiple Engines
 	log.Trace().Msgf("Got a message from: %v", message.Topic())
 	if SharedSubscriptionConfig.PropLogEn {
@@ -118,16 +118,38 @@ func handlePropulsionMessage(message MQTT.Message) {
 	if prop.Timestamp.IsZero() {
 		prop.Timestamp = time.Now()
 	}
-	prop.LogJSON()
+	if !prop.IsEmpty() {
+		prop.LogJSON()
+		if SharedSubscriptionConfig.Repost {
+			PublishClientMessage(client,
+				SharedSubscriptionConfig.RepostRootTopic+"vessel/propulsion/"+prop.Source+"/"+measurement, prop.ToJSON())
+		}
+	}
 }
 
-func (meas Propulsion) LogJSON() {
+func (meas Propulsion) ToJSON() string {
 	jsonData, err := json.Marshal(meas)
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
 	}
-	log.Trace().Msgf("Propulsion: %v", string(jsonData))
+	return string(jsonData)
+}
+
+func (meas Propulsion) LogJSON() {
+	json := meas.ToJSON()
+	log.Trace().Msgf("Propulsion: %v", json)
 	if SharedSubscriptionConfig.PropLogEn {
-		log.Info().Msgf("Propulsion: %v", string(jsonData))
+		log.Info().Msgf("Propulsion: %v", json)
 	}
+}
+
+// Since we are dropping fields we can end up with messages that are just a Source and a Timestamp
+// This allows us to drop those messages
+func (meas Propulsion) IsEmpty() bool {
+	if meas.RPM == 0 && meas.BoostPSI == 0.0 && meas.OilTempF == 0.0 && meas.OilPressure == 0.0 &&
+		meas.CoolantTempF == 0.0 && meas.RunTime == 0 && meas.EngineLoad == 0.0 && meas.EngineTorque == 0.0 &&
+		meas.TransOilTempF == 0.0 && meas.TransOilPressure == 0.0 && meas.AltVoltage == 0.0 && meas.FuelRate == 0.0 {
+		return true
+	}
+	return false
 }

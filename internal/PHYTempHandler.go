@@ -35,10 +35,10 @@ type PHYTemperature struct {
 }
 
 func OnPHYTemperatureMessage(client MQTT.Client, message MQTT.Message) {
-	go handlePHYTemperatureMessage(message)
+	go handlePHYTemperatureMessage(client, message)
 }
 
-func handlePHYTemperatureMessage(message MQTT.Message) {
+func handlePHYTemperatureMessage(client MQTT.Client, message MQTT.Message) {
 	log.Trace().Msgf("Got a message from: %v", message.Topic())
 	if SharedSubscriptionConfig.PHYLogEn {
 		log.Info().Msgf("Got a message from: %v", message.Topic())
@@ -58,15 +58,23 @@ func handlePHYTemperatureMessage(message MQTT.Message) {
 		phyTemp.Timestamp = time.Now()
 	}
 	phyTemp.LogJSON()
+	if SharedSubscriptionConfig.Repost {
+		PublishClientMessage(client, SharedSubscriptionConfig.RepostRootTopic+"rtd/temperature/"+phyTemp.Location, phyTemp.ToJSON())
+	}
 }
 
-func (meas PHYTemperature) LogJSON() {
+func (meas PHYTemperature) ToJSON() string {
 	jsonData, err := json.Marshal(meas)
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
 	}
-	log.Trace().Msgf("Physical Temp: %v", string(jsonData))
+	return string(jsonData)
+}
+
+func (meas PHYTemperature) LogJSON() {
+	json := meas.ToJSON()
+	log.Trace().Msgf("Physical Temp: %v", json)
 	if SharedSubscriptionConfig.PHYLogEn {
-		log.Info().Msgf("Physical Temp: %v", string(jsonData))
+		log.Info().Msgf("Physical Temp: %v", json)
 	}
 }

@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
@@ -41,6 +42,9 @@ type SubscriptionConfig struct {
 	ESPMSHRootTopic  string
 	SignalKRootTopic string
 	CerboRootTopic   string
+	Repost           bool
+	RepostRootTopic  string
+	PublishTimeout   uint
 	MACtoLocation    map[string]string
 	N2KtoName        map[string]string
 	BLESubEn         bool
@@ -195,7 +199,7 @@ func LoadSubscribeServerConfig() (SubscriptionConfig, error) {
 		log.Error().Msg("Server is required but is not configured")
 		return SubscriptionConfig{}, errors.New("server is required but is not set in viper config")
 	}
-	var configItems = []string{"esp-msh-root-topic", "signalk-root-topic", "cerbo-root-topic", "username", "password", "cafile"}
+	var configItems = []string{"esp-msh-root-topic", "signalk-root-topic", "cerbo-root-topic", "username", "password", "cafile", "repost", "repost-root-topic", "publish-timeout"}
 	for _, confItem := range configItems {
 		v, ok = subscriptionMap[confItem]
 		if ok {
@@ -219,26 +223,42 @@ func LoadSubscribeServerConfig() (SubscriptionConfig, error) {
 				}
 				log.Debug().Msgf("Loaded CAFile %v", v)
 				subConf.CACert = cabytes
+			case "repost":
+				tmpbool, err := strconv.ParseBool(v)
+				if err != nil {
+					log.Warn().Msgf("Error parsing boolean from config: %v", err.Error())
+				} else {
+					subConf.Repost = tmpbool
+				}
+			case "repost-root-topic":
+				subConf.RepostRootTopic = v
+			case "publish-timeout":
+				inttmp, err := strconv.ParseUint(v, 10, 32)
+				if err != nil {
+					log.Warn().Msgf("Error parsing publish-timeout will use default: %v", err.Error())
+				} else {
+					subConf.PublishTimeout = uint(inttmp)
+				}
 			}
 		} else {
 			log.Trace().Msgf("%v not found. Continuing", confItem)
 		}
 	}
 
-	if !viper.IsSet("MACtoName") {
+	if !viper.IsSet("subscription.MACtoName") {
 		log.Warn().Msg("MAC to Location Mappings not found")
 	} else {
 		log.Debug().Msg("Loading MAC to Location Mappings")
-		subConf.MACtoLocation = viper.GetStringMapString("MACtoName")
+		subConf.MACtoLocation = viper.GetStringMapString("subscription.MACtoName")
 	}
 
-	if !viper.IsSet("EnableSubscriptions") {
-		log.Debug().Msg("Subscription overrides not found")
+	if !viper.IsSet("subscription.topic-overrides") {
+		log.Debug().Msg("Subscription topic overrides not found")
 		return subConf, nil
 	} else {
-		log.Debug().Msg("Subscription overrides found")
+		log.Debug().Msg("Subscription topics overrides found")
 
-		tmpmap := viper.GetStringMap("EnableSubscriptions")
+		tmpmap := viper.GetStringMap("subscription.topic-overrides")
 		for k, v := range tmpmap {
 			switch k {
 			case "ble":
@@ -267,13 +287,13 @@ func LoadSubscribeServerConfig() (SubscriptionConfig, error) {
 		}
 	}
 
-	if !viper.IsSet("VerboseSubscriptionLogging") {
+	if !viper.IsSet("subscription.verbose-topic-logging") {
 		log.Debug().Msg("Subscription logging overrides not found")
 		return subConf, nil
 	} else {
 		log.Debug().Msg("Subscription logging overrides found")
 
-		tmpmap := viper.GetStringMap("VerboseSubscriptionLogging")
+		tmpmap := viper.GetStringMap("subscription.verbose-topic-logging")
 		for k, v := range tmpmap {
 			switch k {
 			case "ble":
@@ -302,12 +322,12 @@ func LoadSubscribeServerConfig() (SubscriptionConfig, error) {
 		}
 	}
 
-	if !viper.IsSet("N2KtoName") {
+	if !viper.IsSet("subscription.N2KtoName") {
 		log.Warn().Msg("N2K to Name Mappings not found")
 		return subConf, nil
 	} else {
 		log.Debug().Msg("Loading N2K to Device Name Mappings")
-		subConf.N2KtoName = viper.GetStringMapString("N2KtoName")
+		subConf.N2KtoName = viper.GetStringMapString("subscription.N2KtoName")
 	}
 
 	return subConf, nil

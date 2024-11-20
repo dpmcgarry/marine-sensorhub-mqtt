@@ -36,10 +36,10 @@ type BLETemperature struct {
 }
 
 func OnBLETemperatureMessage(client MQTT.Client, message MQTT.Message) {
-	go handleBLETemperatureMessage(message)
+	go handleBLETemperatureMessage(client, message)
 }
 
-func handleBLETemperatureMessage(message MQTT.Message) {
+func handleBLETemperatureMessage(client MQTT.Client, message MQTT.Message) {
 	log.Trace().Msgf("Got a message from: %v", message.Topic())
 	if SharedSubscriptionConfig.BLELogEn {
 		log.Info().Msgf("Got a message from: %v", message.Topic())
@@ -60,15 +60,23 @@ func handleBLETemperatureMessage(message MQTT.Message) {
 		bleTemp.Timestamp = time.Now()
 	}
 	bleTemp.LogJSON()
+	if SharedSubscriptionConfig.Repost {
+		PublishClientMessage(client, SharedSubscriptionConfig.RepostRootTopic+"ble/temperature/"+bleTemp.Location, bleTemp.ToJSON())
+	}
 }
 
-func (meas BLETemperature) LogJSON() {
+func (meas BLETemperature) ToJSON() string {
 	jsonData, err := json.Marshal(meas)
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
 	}
-	log.Trace().Msgf("BLETemp: %v", string(jsonData))
+	return string(jsonData)
+}
+
+func (meas BLETemperature) LogJSON() {
+	json := meas.ToJSON()
+	log.Trace().Msgf("BLETemp: %v", json)
 	if SharedSubscriptionConfig.BLELogEn {
-		log.Info().Msgf("BLETemp: %v", string(jsonData))
+		log.Info().Msgf("BLETemp: %v", json)
 	}
 }

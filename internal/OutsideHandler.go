@@ -34,10 +34,10 @@ type Outside struct {
 }
 
 func OnOutsideMessage(client MQTT.Client, message MQTT.Message) {
-	go handleOutsideMessage(message)
+	go handleOutsideMessage(client, message)
 }
 
-func handleOutsideMessage(message MQTT.Message) {
+func handleOutsideMessage(client MQTT.Client, message MQTT.Message) {
 	log.Trace().Msgf("Got a message from: %v", message.Topic())
 	if SharedSubscriptionConfig.OutsideLogEn {
 		log.Info().Msgf("Got a message from: %v", message.Topic())
@@ -76,16 +76,36 @@ func handleOutsideMessage(message MQTT.Message) {
 	if out.Timestamp.IsZero() {
 		out.Timestamp = time.Now()
 	}
-	out.LogJSON()
+	if !out.IsEmpty() {
+		out.LogJSON()
+		if SharedSubscriptionConfig.Repost {
+			PublishClientMessage(client,
+				SharedSubscriptionConfig.RepostRootTopic+"vessel/environment/outside/"+out.Source+"/"+measurement, out.ToJSON())
+		}
+	}
 }
 
-func (meas Outside) LogJSON() {
+func (meas Outside) ToJSON() string {
 	jsonData, err := json.Marshal(meas)
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
 	}
-	log.Trace().Msgf("Outside: %v", string(jsonData))
+	return string(jsonData)
+}
+
+func (meas Outside) LogJSON() {
+	json := meas.ToJSON()
+	log.Trace().Msgf("Outside: %v", json)
 	if SharedSubscriptionConfig.OutsideLogEn {
-		log.Info().Msgf("Outside: %v", string(jsonData))
+		log.Info().Msgf("Outside: %v", json)
 	}
+}
+
+// Since we are dropping fields we can end up with messages that are just a Source and a Timestamp
+// This allows us to drop those messages
+func (meas Outside) IsEmpty() bool {
+	if meas.TempF == 0.0 && meas.Pressure == 0.0 && meas.PressureInHg == 0.0 {
+		return true
+	}
+	return false
 }
