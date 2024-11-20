@@ -30,7 +30,8 @@ TBD: Notifications
 * Unit tests
 * ~~Change Handlers to Async~~
 * Add InfluxDB
-* Add MQTT Repost
+* ~~Add MQTT Repost~~
 * Look at trimming down number of items
 * ~~Handle Unit Conversions~~
 * Look at having two log files (Warn+ and Info/Debug)
+* Add a message archiving capability
