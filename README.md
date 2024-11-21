@@ -15,7 +15,7 @@ Ref: <https://docs.influxdata.com/influxdb/v2/write-data/best-practices/schema-d
 | espStatus | MAC, Location, IPAddress, MSHVersion | FreeSRAM, FreeHeap, FreePSRAM, WiFiReconnectCount, MQTTReconnectCount, BLEEnabled, RTDEnabled, WiFiRSSI, HasTime, HasResetMQTT |
 | navigation | Source | latitude, longitude, SOG, ROT, COGTrue, HeadingMag, MagVariation, MagDeviation, Attitude, HeadingTrue, STW |
 | gnss | Source | AntennaAlt, Satellites, HozDilution, PosDilution, GeoidalSep, Type, MethodQuality, SatsInView |
-| steering | Source | RudderAngle, AutopilotState, TargetHeadingMag |
+| steering | Source | RudderAngl            e, AutopilotState, TargetHeadingMag |
 | wind | Source | SpeedApp, AngApp, SOG, DirectionTrue |
 | water | Source | TempF |
 | outside | Source | TempF, Pressure |
@@ -30,6 +30,7 @@ TBD: Notifications
 * Unit tests
 * ~~Change Handlers to Async~~
 * Add InfluxDB
+* Check to see if InfluxClient can be shared across threads
 * ~~Add MQTT Repost~~
 * Look at trimming down number of items
 * ~~Handle Unit Conversions~~
