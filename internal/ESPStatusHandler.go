@@ -17,11 +17,14 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package internal
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
+	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
+	"github.com/influxdata/influxdb-client-go/v2/api/write"
 	"github.com/rs/zerolog/log"
 )
 
@@ -72,6 +75,25 @@ func handleESPStatusMessage(client MQTT.Client, message MQTT.Message) {
 	if SharedSubscriptionConfig.Repost {
 		PublishClientMessage(client, SharedSubscriptionConfig.RepostRootTopic+"esp/status/"+espStatus.Location, espStatus.ToJSON())
 	}
+	if SharedSubscriptionConfig.InfluxEnabled {
+		log.Trace().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
+			SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+		if SharedSubscriptionConfig.ESPLogEn {
+			log.Debug().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
+				SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+		}
+		// Sharing a client across threads did not seem to work
+		// So will create a client each time for now
+		client := influxdb2.NewClient(SharedSubscriptionConfig.InfluxUrl, SharedSubscriptionConfig.InfluxToken)
+		writeAPI := client.WriteAPIBlocking(SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+		p := espStatus.ToInfluxPoint()
+		writeAPI.WritePoint(context.Background(), p)
+		client.Close()
+		log.Trace().Msg("Wrote Point")
+		if SharedSubscriptionConfig.ESPLogEn {
+			log.Debug().Msg("Wrote Point")
+		}
+	}
 }
 
 func (meas ESPStatus) ToJSON() string {
@@ -88,4 +110,63 @@ func (meas ESPStatus) LogJSON() {
 	if SharedSubscriptionConfig.ESPLogEn {
 		log.Info().Msgf("ESP Status: %v", json)
 	}
+}
+
+func (meas ESPStatus) GetInfluxTags() map[string]string {
+	tagTmp := make(map[string]string)
+	tagTmp["MAC"] = meas.MAC
+	if meas.Location != "" {
+		tagTmp["Location"] = meas.Location
+	}
+	if meas.IPAddress != "" {
+		tagTmp["IPAddress"] = meas.IPAddress
+	}
+	if meas.MSHVersion != "" {
+		tagTmp["MSHVersion"] = meas.MSHVersion
+	}
+	return tagTmp
+}
+
+func (meas ESPStatus) GetInfluxFields() map[string]interface{} {
+	measTmp := make(map[string]interface{})
+	if meas.FreeSRAM != 0 {
+		measTmp["FreeSRAM"] = meas.FreeSRAM
+	}
+	if meas.FreeHeap != 0 {
+		measTmp["FreeHeap"] = meas.FreeHeap
+	}
+	if meas.FreePSRAM != 0 {
+		measTmp["FreePSRAM"] = meas.FreePSRAM
+	}
+	// These being zero is a valid case so just always include them
+	measTmp["WiFiReconnectCount"] = meas.WiFiReconnectCount
+	measTmp["MQTTReconnectCount"] = meas.MQTTReconnectCount
+	if meas.BLEEnabled {
+		measTmp["BLEEnabled"] = 1
+	} else {
+		measTmp["BLEEnabled"] = 0
+	}
+	if meas.RTDEnabled {
+		measTmp["RTDEnabled"] = 1
+	} else {
+		measTmp["RTDEnabled"] = 0
+	}
+	if meas.HasTime {
+		measTmp["HasTime"] = 1
+	} else {
+		measTmp["HasTime"] = 0
+	}
+	if meas.HasResetMQTT {
+		measTmp["HasResetMQTT"] = 1
+	} else {
+		measTmp["HasResetMQTT"] = 0
+	}
+	if meas.WiFiRSSI != 0 {
+		measTmp["WiFiRSSI"] = meas.WiFiRSSI
+	}
+	return measTmp
+}
+
+func (meas ESPStatus) ToInfluxPoint() *write.Point {
+	return influxdb2.NewPoint("espStatus", meas.GetInfluxTags(), meas.GetInfluxFields(), meas.Timestamp)
 }
