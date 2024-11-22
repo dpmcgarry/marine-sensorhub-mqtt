@@ -47,6 +47,11 @@ type SubscriptionConfig struct {
 	PublishTimeout   uint
 	MACtoLocation    map[string]string
 	N2KtoName        map[string]string
+	InfluxEnabled    bool
+	InfluxOrg        string
+	InfluxBucket     string
+	InfluxToken      string
+	InfluxUrl        string
 	BLESubEn         bool
 	GNSSSubEn        bool
 	ESPSubEn         bool
@@ -328,6 +333,35 @@ func LoadSubscribeServerConfig() (SubscriptionConfig, error) {
 	} else {
 		log.Debug().Msg("Loading N2K to Device Name Mappings")
 		subConf.N2KtoName = viper.GetStringMapString("subscription.N2KtoName")
+	}
+
+	if !viper.IsSet("subscription.influxdb") {
+		log.Warn().Msg("InfluxDB configuration not found")
+		return subConf, nil
+	} else {
+		log.Debug().Msg("Loading InfluxDB Config")
+		tmpmap := viper.GetStringMapString("subscription.influxdb")
+		for k, v := range tmpmap {
+			switch k {
+			case "enabled":
+				booltmp, err := strconv.ParseBool(v)
+				if err != nil {
+					log.Warn().Msgf("Error parsing influx enabled boolean: %v", err.Error())
+					break
+				}
+				subConf.InfluxEnabled = booltmp
+			case "org":
+				subConf.InfluxOrg = v
+			case "bucket":
+				subConf.InfluxBucket = v
+			case "token":
+				subConf.InfluxToken = v
+			case "url":
+				subConf.InfluxUrl = v
+			default:
+				log.Warn().Msgf("Invalid key %v found in InfluxDB", k)
+			}
+		}
 	}
 
 	return subConf, nil

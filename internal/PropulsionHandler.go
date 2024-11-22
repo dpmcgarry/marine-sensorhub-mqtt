@@ -17,11 +17,14 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package internal
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
+	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
+	"github.com/influxdata/influxdb-client-go/v2/api/write"
 	"github.com/rs/zerolog/log"
 )
 
@@ -124,6 +127,25 @@ func handlePropulsionMessage(client MQTT.Client, message MQTT.Message) {
 			PublishClientMessage(client,
 				SharedSubscriptionConfig.RepostRootTopic+"vessel/propulsion/"+prop.Source+"/"+measurement, prop.ToJSON())
 		}
+		if SharedSubscriptionConfig.InfluxEnabled {
+			log.Trace().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
+				SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+			if SharedSubscriptionConfig.PropLogEn {
+				log.Debug().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
+					SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+			}
+			// Sharing a client across threads did not seem to work
+			// So will create a client each time for now
+			client := influxdb2.NewClient(SharedSubscriptionConfig.InfluxUrl, SharedSubscriptionConfig.InfluxToken)
+			writeAPI := client.WriteAPIBlocking(SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+			p := prop.ToInfluxPoint()
+			writeAPI.WritePoint(context.Background(), p)
+			client.Close()
+			log.Trace().Msg("Wrote Point")
+			if SharedSubscriptionConfig.PropLogEn {
+				log.Debug().Msg("Wrote Point")
+			}
+		}
 	}
 }
 
@@ -152,4 +174,61 @@ func (meas Propulsion) IsEmpty() bool {
 		return true
 	}
 	return false
+}
+
+func (meas Propulsion) GetInfluxTags() map[string]string {
+	tagTmp := make(map[string]string)
+	if meas.Source != "" {
+		tagTmp["Source"] = meas.Source
+	}
+	if meas.Device != "" {
+		tagTmp["Device"] = meas.Device
+	}
+	return tagTmp
+}
+
+func (meas Propulsion) GetInfluxFields() map[string]interface{} {
+	measTmp := make(map[string]interface{})
+	if meas.RPM != 0 {
+		measTmp["RPM"] = meas.RPM
+	}
+	if meas.BoostPSI != 0.0 {
+		measTmp["BoostPSI"] = meas.BoostPSI
+	}
+	if meas.OilTempF != 0.0 {
+		measTmp["OilTempF"] = meas.OilTempF
+	}
+	if meas.OilPressure != 0.0 {
+		measTmp["OilPressure"] = meas.OilPressure
+	}
+	if meas.CoolantTempF != 0.0 {
+		measTmp["CoolantTempF"] = meas.CoolantTempF
+	}
+	if meas.RunTime != 0 {
+		measTmp["RunTime"] = meas.RunTime
+	}
+	if meas.EngineLoad != 0.0 {
+		measTmp["EngineLoad"] = meas.EngineLoad
+	}
+	if meas.EngineTorque != 0.0 {
+		measTmp["EngineTorque"] = meas.EngineTorque
+	}
+	if meas.TransOilTempF != 0.0 {
+		measTmp["TransOilTempF"] = meas.TransOilTempF
+	}
+	if meas.TransOilPressure != 0.0 {
+		measTmp["TransOilPressure"] = meas.TransOilPressure
+	}
+	if meas.AltVoltage != 0.0 {
+		measTmp["AlternatorVoltage"] = meas.AltVoltage
+	}
+	if meas.FuelRate != 0.0 {
+		measTmp["FuelRate"] = meas.FuelRate
+	}
+
+	return measTmp
+}
+
+func (meas Propulsion) ToInfluxPoint() *write.Point {
+	return influxdb2.NewPoint("propulsion", meas.GetInfluxTags(), meas.GetInfluxFields(), meas.Timestamp)
 }

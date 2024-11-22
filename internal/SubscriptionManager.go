@@ -29,7 +29,7 @@ var ISOTimeLayout string = "2006-01-02T15:04:05.000Z"
 
 func HandleSubscriptions(subscribeconf SubscriptionConfig) {
 	SharedSubscriptionConfig = &subscribeconf
-	log.Debug().Msgf("Will subscribe on server %v", subscribeconf.Host)
+	log.Info().Msgf("Will subscribe on server %v", subscribeconf.Host)
 	mqttOpts := MQTT.NewClientOptions()
 	mqttOpts.AddBroker(subscribeconf.Host)
 	if subscribeconf.Username != "" {
@@ -63,7 +63,10 @@ func HandleSubscriptions(subscribeconf SubscriptionConfig) {
 		log.Warn().Msgf("Error Connecting to host: %v", token.Error())
 		return
 	}
-
+	if SharedSubscriptionConfig.InfluxEnabled {
+		log.Info().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
+			SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+	}
 	if subscribeconf.BLESubEn {
 		topic := subscribeconf.ESPMSHRootTopic + "ble/temperature/#"
 		addSubscription(topic, OnBLETemperatureMessage, mqttClient)

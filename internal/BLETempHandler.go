@@ -17,11 +17,14 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package internal
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
+	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
+	"github.com/influxdata/influxdb-client-go/v2/api/write"
 	"github.com/rs/zerolog/log"
 )
 
@@ -63,6 +66,25 @@ func handleBLETemperatureMessage(client MQTT.Client, message MQTT.Message) {
 	if SharedSubscriptionConfig.Repost {
 		PublishClientMessage(client, SharedSubscriptionConfig.RepostRootTopic+"ble/temperature/"+bleTemp.Location, bleTemp.ToJSON())
 	}
+	if SharedSubscriptionConfig.InfluxEnabled {
+		log.Trace().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
+			SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+		if SharedSubscriptionConfig.BLELogEn {
+			log.Debug().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
+				SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+		}
+		// Sharing a client across threads did not seem to work
+		// So will create a client each time for now
+		client := influxdb2.NewClient(SharedSubscriptionConfig.InfluxUrl, SharedSubscriptionConfig.InfluxToken)
+		writeAPI := client.WriteAPIBlocking(SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+		p := bleTemp.ToInfluxPoint()
+		writeAPI.WritePoint(context.Background(), p)
+		client.Close()
+		log.Trace().Msg("Wrote Point")
+		if SharedSubscriptionConfig.BLELogEn {
+			log.Debug().Msg("Wrote Point")
+		}
+	}
 }
 
 func (meas BLETemperature) ToJSON() string {
@@ -79,4 +101,34 @@ func (meas BLETemperature) LogJSON() {
 	if SharedSubscriptionConfig.BLELogEn {
 		log.Info().Msgf("BLETemp: %v", json)
 	}
+}
+
+func (meas BLETemperature) GetInfluxTags() map[string]string {
+	tagTmp := make(map[string]string)
+	tagTmp["MAC"] = meas.MAC
+	if meas.Location != "" {
+		tagTmp["Location"] = meas.Location
+	}
+	return tagTmp
+}
+
+func (meas BLETemperature) GetInfluxFields() map[string]interface{} {
+	measTmp := make(map[string]interface{})
+	if meas.TempF != 0.0 {
+		measTmp["TempF"] = meas.TempF
+	}
+	if meas.BatteryPercent != 0.0 {
+		measTmp["BatteryPercent"] = meas.BatteryPercent
+	}
+	if meas.Humidity != 0.0 {
+		measTmp["Humidity"] = meas.Humidity
+	}
+	if meas.RSSI != 0 {
+		measTmp["RSSI"] = meas.RSSI
+	}
+	return measTmp
+}
+
+func (meas BLETemperature) ToInfluxPoint() *write.Point {
+	return influxdb2.NewPoint("bleTemperature", meas.GetInfluxTags(), meas.GetInfluxFields(), meas.Timestamp)
 }

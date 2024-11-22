@@ -17,11 +17,14 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package internal
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
+	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
+	"github.com/influxdata/influxdb-client-go/v2/api/write"
 	"github.com/rs/zerolog/log"
 )
 
@@ -61,6 +64,25 @@ func handlePHYTemperatureMessage(client MQTT.Client, message MQTT.Message) {
 	if SharedSubscriptionConfig.Repost {
 		PublishClientMessage(client, SharedSubscriptionConfig.RepostRootTopic+"rtd/temperature/"+phyTemp.Location, phyTemp.ToJSON())
 	}
+	if SharedSubscriptionConfig.InfluxEnabled {
+		log.Trace().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
+			SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+		if SharedSubscriptionConfig.PHYLogEn {
+			log.Debug().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
+				SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+		}
+		// Sharing a client across threads did not seem to work
+		// So will create a client each time for now
+		client := influxdb2.NewClient(SharedSubscriptionConfig.InfluxUrl, SharedSubscriptionConfig.InfluxToken)
+		writeAPI := client.WriteAPIBlocking(SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+		p := phyTemp.ToInfluxPoint()
+		writeAPI.WritePoint(context.Background(), p)
+		client.Close()
+		log.Trace().Msg("Wrote Point")
+		if SharedSubscriptionConfig.PHYLogEn {
+			log.Debug().Msg("Wrote Point")
+		}
+	}
 }
 
 func (meas PHYTemperature) ToJSON() string {
@@ -77,4 +99,31 @@ func (meas PHYTemperature) LogJSON() {
 	if SharedSubscriptionConfig.PHYLogEn {
 		log.Info().Msgf("Physical Temp: %v", json)
 	}
+}
+
+func (meas PHYTemperature) GetInfluxTags() map[string]string {
+	tagTmp := make(map[string]string)
+	tagTmp["MAC"] = meas.MAC
+	if meas.Location != "" {
+		tagTmp["Location"] = meas.Location
+	}
+	if meas.Device != "" {
+		tagTmp["Device"] = meas.Device
+	}
+	if meas.Component != "" {
+		tagTmp["Component"] = meas.Component
+	}
+	return tagTmp
+}
+
+func (meas PHYTemperature) GetInfluxFields() map[string]interface{} {
+	measTmp := make(map[string]interface{})
+	if meas.TempF != 0.0 {
+		measTmp["TempF"] = meas.TempF
+	}
+	return measTmp
+}
+
+func (meas PHYTemperature) ToInfluxPoint() *write.Point {
+	return influxdb2.NewPoint("phyTemperature", meas.GetInfluxTags(), meas.GetInfluxFields(), meas.Timestamp)
 }

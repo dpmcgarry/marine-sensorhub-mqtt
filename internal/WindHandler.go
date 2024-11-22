@@ -17,11 +17,14 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package internal
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
+	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
+	"github.com/influxdata/influxdb-client-go/v2/api/write"
 	"github.com/rs/zerolog/log"
 )
 
@@ -86,6 +89,25 @@ func handleWindMessage(client MQTT.Client, message MQTT.Message) {
 			PublishClientMessage(client,
 				SharedSubscriptionConfig.RepostRootTopic+"vessel/environment/wind/"+wind.Source+"/"+measurement, wind.ToJSON())
 		}
+		if SharedSubscriptionConfig.InfluxEnabled {
+			log.Trace().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
+				SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+			if SharedSubscriptionConfig.WindLogEn {
+				log.Debug().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
+					SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+			}
+			// Sharing a client across threads did not seem to work
+			// So will create a client each time for now
+			client := influxdb2.NewClient(SharedSubscriptionConfig.InfluxUrl, SharedSubscriptionConfig.InfluxToken)
+			writeAPI := client.WriteAPIBlocking(SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+			p := wind.ToInfluxPoint()
+			writeAPI.WritePoint(context.Background(), p)
+			client.Close()
+			log.Trace().Msg("Wrote Point")
+			if SharedSubscriptionConfig.WindLogEn {
+				log.Debug().Msg("Wrote Point")
+			}
+		}
 	}
 }
 
@@ -112,4 +134,34 @@ func (meas Wind) IsEmpty() bool {
 		return true
 	}
 	return false
+}
+
+func (meas Wind) GetInfluxTags() map[string]string {
+	tagTmp := make(map[string]string)
+	if meas.Source != "" {
+		tagTmp["Source"] = meas.Source
+	}
+	return tagTmp
+}
+
+func (meas Wind) GetInfluxFields() map[string]interface{} {
+	measTmp := make(map[string]interface{})
+	if meas.SpeedApp != 0.0 {
+		measTmp["SpeedApp"] = meas.SpeedApp
+	}
+	if meas.AngleApp != 0.0 {
+		measTmp["AngleApp"] = meas.AngleApp
+	}
+	if meas.SOG != 0.0 {
+		measTmp["SOG"] = meas.SOG
+	}
+	if meas.DirectionTrue != 0.0 {
+		measTmp["DirectionTrue"] = meas.DirectionTrue
+	}
+
+	return measTmp
+}
+
+func (meas Wind) ToInfluxPoint() *write.Point {
+	return influxdb2.NewPoint("wind", meas.GetInfluxTags(), meas.GetInfluxFields(), meas.Timestamp)
 }

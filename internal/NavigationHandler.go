@@ -17,11 +17,14 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package internal
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
+	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
+	"github.com/influxdata/influxdb-client-go/v2/api/write"
 	"github.com/rs/zerolog/log"
 )
 
@@ -82,7 +85,7 @@ func handleNavigationMessage(client MQTT.Client, message MQTT.Message) {
 	case "position":
 		postmp := rawData["value"].(map[string]any)
 		nav.Lat = postmp["latitude"].(float64)
-		nav.Lat = postmp["longitude"].(float64)
+		nav.Lon = postmp["longitude"].(float64)
 		alt, ok := postmp["altitude"].(float64)
 		if ok {
 			nav.Alt = MetersToFeet(alt)
@@ -109,7 +112,7 @@ func handleNavigationMessage(client MQTT.Client, message MQTT.Message) {
 		}
 		flttmp, ok = atttmp["roll"].(float64)
 		if ok {
-			nav.Yaw = RadiansToDegrees(flttmp)
+			nav.Roll = RadiansToDegrees(flttmp)
 		}
 	case "speedThroughWater":
 		nav.STW = MetersPerSecondToKnots(rawData["value"].(float64))
@@ -134,6 +137,25 @@ func handleNavigationMessage(client MQTT.Client, message MQTT.Message) {
 		if SharedSubscriptionConfig.Repost {
 			PublishClientMessage(client,
 				SharedSubscriptionConfig.RepostRootTopic+"vessel/navigation/"+nav.Source+"/"+measurement, nav.ToJSON())
+		}
+		if SharedSubscriptionConfig.InfluxEnabled {
+			log.Trace().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
+				SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+			if SharedSubscriptionConfig.NavLogEn {
+				log.Debug().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
+					SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+			}
+			// Sharing a client across threads did not seem to work
+			// So will create a client each time for now
+			client := influxdb2.NewClient(SharedSubscriptionConfig.InfluxUrl, SharedSubscriptionConfig.InfluxToken)
+			writeAPI := client.WriteAPIBlocking(SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+			p := nav.ToInfluxPoint()
+			writeAPI.WritePoint(context.Background(), p)
+			client.Close()
+			log.Trace().Msg("Wrote Point")
+			if SharedSubscriptionConfig.NavLogEn {
+				log.Debug().Msg("Wrote Point")
+			}
 		}
 	}
 }
@@ -166,4 +188,64 @@ func (meas Navigation) IsEmpty() bool {
 		return true
 	}
 	return false
+}
+
+func (meas Navigation) GetInfluxTags() map[string]string {
+	tagTmp := make(map[string]string)
+	if meas.Source != "" {
+		tagTmp["Source"] = meas.Source
+	}
+	return tagTmp
+}
+
+func (meas Navigation) GetInfluxFields() map[string]interface{} {
+	measTmp := make(map[string]interface{})
+	if meas.Lat != 0.0 {
+		measTmp["Latitude"] = meas.Lat
+	}
+	if meas.Lon != 0.0 {
+		measTmp["Longitude"] = meas.Lon
+	}
+	if meas.Alt != 0.0 {
+		measTmp["Altitude"] = meas.Alt
+	}
+	if meas.SOG != 0.0 {
+		measTmp["SpeedOverGround"] = meas.SOG
+	}
+	if meas.ROT != 0.0 {
+		measTmp["RateOfTurn"] = meas.ROT
+	}
+	if meas.COGTrue != 0.0 {
+		measTmp["CourseOverGroundTrue"] = meas.COGTrue
+	}
+	if meas.HeadingMag != 0.0 {
+		measTmp["HeadingMagnetic"] = meas.HeadingMag
+	}
+	if meas.MagVariation != 0.0 {
+		measTmp["MagneticVariation"] = meas.MagVariation
+	}
+	if meas.MagDeviation != 0.0 {
+		measTmp["MagneticDeviation"] = meas.MagDeviation
+	}
+	if meas.Yaw != 0.0 {
+		measTmp["Yaw"] = meas.Yaw
+	}
+	if meas.Pitch != 0.0 {
+		measTmp["Pitch"] = meas.Pitch
+	}
+	if meas.Roll != 0.0 {
+		measTmp["Roll"] = meas.Roll
+	}
+	if meas.HeadingTrue != 0.0 {
+		measTmp["HeadingTrue"] = meas.HeadingTrue
+	}
+	if meas.STW != 0.0 {
+		measTmp["SpeedThroughWater"] = meas.STW
+	}
+
+	return measTmp
+}
+
+func (meas Navigation) ToInfluxPoint() *write.Point {
+	return influxdb2.NewPoint("navigation", meas.GetInfluxTags(), meas.GetInfluxFields(), meas.Timestamp)
 }
