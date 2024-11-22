@@ -116,3 +116,6 @@ workflows:
             - apt-repo
           requires:
             - build
+          filters:
+            branches:
+              only: main
