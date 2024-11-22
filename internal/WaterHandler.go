@@ -17,11 +17,14 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package internal
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
+	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
+	"github.com/influxdata/influxdb-client-go/v2/api/write"
 	"github.com/rs/zerolog/log"
 )
 
@@ -80,6 +83,25 @@ func handleWaterMessage(client MQTT.Client, message MQTT.Message) {
 			PublishClientMessage(client,
 				SharedSubscriptionConfig.RepostRootTopic+"vessel/environment/water/"+water.Source+"/"+measurement, water.ToJSON())
 		}
+		if SharedSubscriptionConfig.InfluxEnabled {
+			log.Trace().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
+				SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+			if SharedSubscriptionConfig.WaterLogEn {
+				log.Debug().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
+					SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+			}
+			// Sharing a client across threads did not seem to work
+			// So will create a client each time for now
+			client := influxdb2.NewClient(SharedSubscriptionConfig.InfluxUrl, SharedSubscriptionConfig.InfluxToken)
+			writeAPI := client.WriteAPIBlocking(SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+			p := water.ToInfluxPoint()
+			writeAPI.WritePoint(context.Background(), p)
+			client.Close()
+			log.Trace().Msg("Wrote Point")
+			if SharedSubscriptionConfig.WaterLogEn {
+				log.Debug().Msg("Wrote Point")
+			}
+		}
 	}
 }
 
@@ -106,4 +128,28 @@ func (meas Water) IsEmpty() bool {
 		return true
 	}
 	return false
+}
+
+func (meas Water) GetInfluxTags() map[string]string {
+	tagTmp := make(map[string]string)
+	if meas.Source != "" {
+		tagTmp["Source"] = meas.Source
+	}
+	return tagTmp
+}
+
+func (meas Water) GetInfluxFields() map[string]interface{} {
+	measTmp := make(map[string]interface{})
+	if meas.TempF != 0.0 {
+		measTmp["TempF"] = meas.TempF
+	}
+	if meas.DepthUnderTransducerFt != 0.0 {
+		measTmp["DepthUnderTransducerFt"] = meas.DepthUnderTransducerFt
+	}
+
+	return measTmp
+}
+
+func (meas Water) ToInfluxPoint() *write.Point {
+	return influxdb2.NewPoint("water", meas.GetInfluxTags(), meas.GetInfluxFields(), meas.Timestamp)
 }

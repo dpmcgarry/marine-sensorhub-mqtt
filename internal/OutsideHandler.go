@@ -17,11 +17,14 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package internal
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
+	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
+	"github.com/influxdata/influxdb-client-go/v2/api/write"
 	"github.com/rs/zerolog/log"
 )
 
@@ -82,6 +85,25 @@ func handleOutsideMessage(client MQTT.Client, message MQTT.Message) {
 			PublishClientMessage(client,
 				SharedSubscriptionConfig.RepostRootTopic+"vessel/environment/outside/"+out.Source+"/"+measurement, out.ToJSON())
 		}
+		if SharedSubscriptionConfig.InfluxEnabled {
+			log.Trace().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
+				SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+			if SharedSubscriptionConfig.OutsideLogEn {
+				log.Debug().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
+					SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+			}
+			// Sharing a client across threads did not seem to work
+			// So will create a client each time for now
+			client := influxdb2.NewClient(SharedSubscriptionConfig.InfluxUrl, SharedSubscriptionConfig.InfluxToken)
+			writeAPI := client.WriteAPIBlocking(SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+			p := out.ToInfluxPoint()
+			writeAPI.WritePoint(context.Background(), p)
+			client.Close()
+			log.Trace().Msg("Wrote Point")
+			if SharedSubscriptionConfig.OutsideLogEn {
+				log.Debug().Msg("Wrote Point")
+			}
+		}
 	}
 }
 
@@ -108,4 +130,28 @@ func (meas Outside) IsEmpty() bool {
 		return true
 	}
 	return false
+}
+
+func (meas Outside) GetInfluxTags() map[string]string {
+	tagTmp := make(map[string]string)
+	if meas.Source != "" {
+		tagTmp["Source"] = meas.Source
+	}
+	return tagTmp
+}
+
+func (meas Outside) GetInfluxFields() map[string]interface{} {
+	measTmp := make(map[string]interface{})
+	if meas.TempF != 0.0 {
+		measTmp["TempF"] = meas.TempF
+	}
+	if meas.Pressure != 0.0 {
+		measTmp["Pressure"] = meas.Pressure
+	}
+
+	return measTmp
+}
+
+func (meas Outside) ToInfluxPoint() *write.Point {
+	return influxdb2.NewPoint("outside", meas.GetInfluxTags(), meas.GetInfluxFields(), meas.Timestamp)
 }

@@ -17,11 +17,14 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package internal
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
+	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
+	"github.com/influxdata/influxdb-client-go/v2/api/write"
 	"github.com/rs/zerolog/log"
 )
 
@@ -99,6 +102,25 @@ func handleGNSSMessage(client MQTT.Client, message MQTT.Message) {
 			PublishClientMessage(client,
 				SharedSubscriptionConfig.RepostRootTopic+"vessel/gnss/"+gnss.Source+"/"+measurement, gnss.ToJSON())
 		}
+		if SharedSubscriptionConfig.InfluxEnabled {
+			log.Trace().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
+				SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+			if SharedSubscriptionConfig.GNSSLogEn {
+				log.Debug().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
+					SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+			}
+			// Sharing a client across threads did not seem to work
+			// So will create a client each time for now
+			client := influxdb2.NewClient(SharedSubscriptionConfig.InfluxUrl, SharedSubscriptionConfig.InfluxToken)
+			writeAPI := client.WriteAPIBlocking(SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+			p := gnss.ToInfluxPoint()
+			writeAPI.WritePoint(context.Background(), p)
+			client.Close()
+			log.Trace().Msg("Wrote Point")
+			if SharedSubscriptionConfig.GNSSLogEn {
+				log.Debug().Msg("Wrote Point")
+			}
+		}
 	}
 }
 
@@ -126,4 +148,43 @@ func (meas GNSS) IsEmpty() bool {
 		return true
 	}
 	return false
+}
+
+func (meas GNSS) GetInfluxTags() map[string]string {
+	tagTmp := make(map[string]string)
+	if meas.Source != "" {
+		tagTmp["Source"] = meas.Source
+	}
+	return tagTmp
+}
+
+func (meas GNSS) GetInfluxFields() map[string]interface{} {
+	measTmp := make(map[string]interface{})
+	if meas.AntennaAlt != 0.0 {
+		measTmp["AntennaAlt"] = meas.AntennaAlt
+	}
+	if meas.Satellites != 0.0 {
+		measTmp["Satellites"] = meas.Satellites
+	}
+	if meas.HozDilution != 0.0 {
+		measTmp["HozDilution"] = meas.HozDilution
+	}
+	if meas.PosDilution != 0.0 {
+		measTmp["PosDilution"] = meas.PosDilution
+	}
+	if meas.GeoidalSep != 0.0 {
+		measTmp["GeoidalSep"] = meas.GeoidalSep
+	}
+	if meas.Type != "" {
+		measTmp["Type"] = meas.Type
+	}
+	if meas.MethodQuality != "" {
+		measTmp["MethodQuality"] = meas.MethodQuality
+	}
+
+	return measTmp
+}
+
+func (meas GNSS) ToInfluxPoint() *write.Point {
+	return influxdb2.NewPoint("gnss", meas.GetInfluxTags(), meas.GetInfluxFields(), meas.Timestamp)
 }

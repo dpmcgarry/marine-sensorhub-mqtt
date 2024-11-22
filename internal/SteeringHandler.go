@@ -17,11 +17,14 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package internal
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
+	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
+	"github.com/influxdata/influxdb-client-go/v2/api/write"
 	"github.com/rs/zerolog/log"
 )
 
@@ -90,6 +93,25 @@ func handleSteeringMessage(client MQTT.Client, message MQTT.Message) {
 			PublishClientMessage(client,
 				SharedSubscriptionConfig.RepostRootTopic+"vessel/steering/"+steer.Source+"/"+measurement, steer.ToJSON())
 		}
+		if SharedSubscriptionConfig.InfluxEnabled {
+			log.Trace().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
+				SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+			if SharedSubscriptionConfig.SteerLogEn {
+				log.Debug().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
+					SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+			}
+			// Sharing a client across threads did not seem to work
+			// So will create a client each time for now
+			client := influxdb2.NewClient(SharedSubscriptionConfig.InfluxUrl, SharedSubscriptionConfig.InfluxToken)
+			writeAPI := client.WriteAPIBlocking(SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+			p := steer.ToInfluxPoint()
+			writeAPI.WritePoint(context.Background(), p)
+			client.Close()
+			log.Trace().Msg("Wrote Point")
+			if SharedSubscriptionConfig.SteerLogEn {
+				log.Debug().Msg("Wrote Point")
+			}
+		}
 	}
 }
 
@@ -116,4 +138,31 @@ func (meas Steering) IsEmpty() bool {
 		return true
 	}
 	return false
+}
+
+func (meas Steering) GetInfluxTags() map[string]string {
+	tagTmp := make(map[string]string)
+	if meas.Source != "" {
+		tagTmp["Source"] = meas.Source
+	}
+	return tagTmp
+}
+
+func (meas Steering) GetInfluxFields() map[string]interface{} {
+	measTmp := make(map[string]interface{})
+	if meas.RudderAngle != 0.0 {
+		measTmp["RudderAngle"] = meas.RudderAngle
+	}
+	if meas.AutopilotState != "" {
+		measTmp["AutopilotState"] = meas.AutopilotState
+	}
+	if meas.TargetHeadingMag != 0.0 {
+		measTmp["TargetHeading"] = meas.TargetHeadingMag
+	}
+
+	return measTmp
+}
+
+func (meas Steering) ToInfluxPoint() *write.Point {
+	return influxdb2.NewPoint("steering", meas.GetInfluxTags(), meas.GetInfluxFields(), meas.Timestamp)
 }

@@ -15,11 +15,11 @@ Ref: <https://docs.influxdata.com/influxdb/v2/write-data/best-practices/schema-d
 | espStatus | MAC, Location, IPAddress, MSHVersion | FreeSRAM, FreeHeap, FreePSRAM, WiFiReconnectCount, MQTTReconnectCount, BLEEnabled, RTDEnabled, WiFiRSSI, HasTime, HasResetMQTT |
 | navigation | Source | latitude, longitude, SOG, ROT, COGTrue, HeadingMag, MagVariation, MagDeviation, Attitude, HeadingTrue, STW |
 | gnss | Source | AntennaAlt, Satellites, HozDilution, PosDilution, GeoidalSep, Type, MethodQuality, SatsInView |
-| steering | Source | RudderAngl            e, AutopilotState, TargetHeadingMag |
+| steering | Source | RudderAngle, AutopilotState, TargetHeadingMag |
 | wind | Source | SpeedApp, AngApp, SOG, DirectionTrue |
-| water | Source | TempF |
+| water | Source | TempF, DepthUnderTransducerFt |
 | outside | Source | TempF, Pressure |
-| propulsion | Device, Source | RPM, BoostPSI, OilTempF, OilPressure, CoolanltTempF, RunTime, EngineLoad, EngineTorque, TransOilTempF, TransOilPressure |
+| propulsion | Device, Source | RPM, BoostPSI, OilTempF, OilPressure, CoolantTempF, RunTime, EngineLoad, EngineTorque, TransOilTempF, TransOilPressure, AltVoltage, FuelRate |
 
 TBD: Notifications
 
@@ -29,8 +29,9 @@ TBD: Notifications
 * ~~Cleanup MAC / N2K in Global and Subscription~~
 * Unit tests
 * ~~Change Handlers to Async~~
-* Add InfluxDB
+* ~~Add InfluxDB~~
 * Check to see if InfluxClient can be shared across threads
+* Check on what provides altitude and if it is getting lost somehow
 * ~~Add MQTT Repost~~
 * Look at trimming down number of items
 * ~~Handle Unit Conversions~~
