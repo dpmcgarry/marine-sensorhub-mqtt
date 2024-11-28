@@ -25,15 +25,19 @@ TBD: Notifications
 
 ## TODO
 
-* ~~Add logging overrides~~
-* ~~Cleanup MAC / N2K in Global and Subscription~~
-* Unit tests
-* ~~Change Handlers to Async~~
-* ~~Add InfluxDB~~
-* Check to see if InfluxClient can be shared across threads
-* Check on what provides altitude and if it is getting lost somehow
-* ~~Add MQTT Repost~~
-* Look at trimming down number of items
-* ~~Handle Unit Conversions~~
+* Cleanup the massive function for subscription stuff in Config.go
 * Look at having two log files (Warn+ and Info/Debug)
 * Add a message archiving capability
+* Unit tests
+* Check to see if InfluxClient can be shared across threads
+* Check on what provides altitude and if it is getting lost somehow
+* Ensure MQTT Disconnect / Reconnect / Errors work
+* Do more than just log influx errors
+* ~~Add logging overrides~~
+* ~~Cleanup MAC / N2K in Global and Subscription~~
+* ~~Change Handlers to Async~~
+* ~~Add InfluxDB~~
+* ~~Add MQTT Repost~~
+* ~~Look at trimming down number of items~~
+* ~~Handle Unit Conversions~~
+* ~~Logging / errors on MQTT / InfluxDB disconnect / write errors~~

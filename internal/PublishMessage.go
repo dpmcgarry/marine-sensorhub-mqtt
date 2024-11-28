@@ -74,4 +74,8 @@ func PublishClientMessage(client MQTT.Client, topic string, messagedata string) 
 	log.Trace().Msgf("Will publish message: %v", messagedata)
 	token := client.Publish(topic, byte(0), false, messagedata)
 	token.WaitTimeout(time.Duration(SharedSubscriptionConfig.PublishTimeout) * time.Millisecond)
+	err := token.Error()
+	if err != nil {
+		log.Warn().Msgf("Error publishing message: %v", err.Error())
+	}
 }

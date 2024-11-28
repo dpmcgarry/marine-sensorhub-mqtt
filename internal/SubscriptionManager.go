@@ -19,6 +19,7 @@ package internal
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"net/url"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	"github.com/rs/zerolog/log"
@@ -57,7 +58,12 @@ func HandleSubscriptions(subscribeconf SubscriptionConfig) {
 		mqttOpts.SetTLSConfig(tlsConfig)
 		log.Debug().Msg("Configured TLS")
 	}
-	mqttOpts.AutoReconnect = true
+	mqttOpts.SetAutoReconnect(true)
+	mqttOpts.SetConnectRetry(true)
+	mqttOpts.SetConnectionAttemptHandler(onConnectionAttempt)
+	mqttOpts.SetConnectionLostHandler(onConnectionLost)
+	mqttOpts.SetOnConnectHandler(onConnect)
+	mqttOpts.SetReconnectingHandler(onReconnect)
 	mqttClient := MQTT.NewClient(mqttOpts)
 	if token := mqttClient.Connect(); token.Wait() && token.Error() != nil {
 		log.Warn().Msgf("Error Connecting to host: %v", token.Error())
@@ -68,48 +74,55 @@ func HandleSubscriptions(subscribeconf SubscriptionConfig) {
 			SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
 	}
 	if subscribeconf.BLESubEn {
-		topic := subscribeconf.ESPMSHRootTopic + "ble/temperature/#"
-		addSubscription(topic, OnBLETemperatureMessage, mqttClient)
+		for _, topic := range subscribeconf.BLETopics {
+			addSubscription(topic, OnBLETemperatureMessage, mqttClient)
+		}
 	}
 	if subscribeconf.PHYSubEn {
-		topic := subscribeconf.ESPMSHRootTopic + "rtd/temperature/#"
-		addSubscription(topic, OnPHYTemperatureMessage, mqttClient)
+		for _, topic := range subscribeconf.PHYTopics {
+			addSubscription(topic, OnPHYTemperatureMessage, mqttClient)
+		}
 	}
 	if subscribeconf.ESPSubEn {
-		topic := subscribeconf.ESPMSHRootTopic + "esp/status/#"
-		addSubscription(topic, OnESPStatusMessage, mqttClient)
+		for _, topic := range subscribeconf.ESPTopics {
+			addSubscription(topic, OnESPStatusMessage, mqttClient)
+		}
 	}
 	if subscribeconf.NavSubEn {
-		topic := subscribeconf.SignalKRootTopic + "vessels/self/navigation/+"
-		addSubscription(topic, OnNavigationMessage, mqttClient)
+		for _, topic := range subscribeconf.NavTopics {
+			addSubscription(topic, OnNavigationMessage, mqttClient)
+		}
 	}
 	if subscribeconf.GNSSSubEn {
-		topic := subscribeconf.SignalKRootTopic + "vessels/self/navigation/gnss/#"
-		addSubscription(topic, OnGNSSMessage, mqttClient)
+		for _, topic := range subscribeconf.GNSSTopics {
+			addSubscription(topic, OnGNSSMessage, mqttClient)
+		}
 	}
 	if subscribeconf.SteerSubEn {
-		topic := subscribeconf.SignalKRootTopic + "vessels/self/steering/#"
-		addSubscription(topic, OnSteeringMessage, mqttClient)
+		for _, topic := range subscribeconf.SteeringTopics {
+			addSubscription(topic, OnSteeringMessage, mqttClient)
+		}
 	}
 	if subscribeconf.WindSubEn {
-		topic := subscribeconf.SignalKRootTopic + "vessels/self/environment/wind/#"
-		addSubscription(topic, OnWindMessage, mqttClient)
+		for _, topic := range subscribeconf.WindTopics {
+			addSubscription(topic, OnWindMessage, mqttClient)
+		}
 	}
 	if subscribeconf.WaterSubEn {
-		topic := subscribeconf.SignalKRootTopic + "vessels/self/environment/water/#"
-		addSubscription(topic, OnWaterMessage, mqttClient)
-		topic = subscribeconf.SignalKRootTopic + "vessels/self/environment/depth/#"
-		addSubscription(topic, OnWaterMessage, mqttClient)
+		for _, topic := range subscribeconf.WaterTopics {
+			addSubscription(topic, OnWaterMessage, mqttClient)
+		}
 	}
 	if subscribeconf.OutsideSubEn {
-		topic := subscribeconf.SignalKRootTopic + "vessels/self/environment/outside/#"
-		addSubscription(topic, OnOutsideMessage, mqttClient)
+		for _, topic := range subscribeconf.OutsideTopics {
+			addSubscription(topic, OnOutsideMessage, mqttClient)
+		}
 	}
 	if subscribeconf.PropSubEn {
-		topic := subscribeconf.SignalKRootTopic + "vessels/self/propulsion/#"
-		addSubscription(topic, OnPropulsionMessage, mqttClient)
+		for _, topic := range subscribeconf.PropulsionTopics {
+			addSubscription(topic, OnPropulsionMessage, mqttClient)
+		}
 	}
-
 }
 
 func addSubscription(topic string, target MQTT.MessageHandler, mqttClient MQTT.Client) {
@@ -117,4 +130,21 @@ func addSubscription(topic string, target MQTT.MessageHandler, mqttClient MQTT.C
 	if token := mqttClient.Subscribe(topic, byte(0), target); token.Wait() && token.Error() != nil {
 		log.Warn().Msgf("Error subscribing to topic %v with error %v", topic, token.Error())
 	}
+}
+
+func onConnectionAttempt(broker *url.URL, tlsCfg *tls.Config) *tls.Config {
+	log.Info().Msgf("Attempting connection to: %v", broker.String())
+	return tlsCfg
+}
+
+func onConnectionLost(client MQTT.Client, err error) {
+	log.Warn().Msgf("Connection Lost! %v", err.Error())
+}
+
+func onConnect(client MQTT.Client) {
+	log.Info().Msg("Connected!")
+}
+
+func onReconnect(client MQTT.Client, opts *MQTT.ClientOptions) {
+	log.Warn().Msg("Attempting to reconnect")
 }

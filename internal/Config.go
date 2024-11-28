@@ -39,9 +39,16 @@ type SubscriptionConfig struct {
 	Username         string
 	Password         string
 	CACert           []byte
-	ESPMSHRootTopic  string
-	SignalKRootTopic string
-	CerboRootTopic   string
+	BLETopics        []string
+	PHYTopics        []string
+	ESPTopics        []string
+	NavTopics        []string
+	GNSSTopics       []string
+	SteeringTopics   []string
+	WindTopics       []string
+	WaterTopics      []string
+	OutsideTopics    []string
+	PropulsionTopics []string
 	Repost           bool
 	RepostRootTopic  string
 	PublishTimeout   uint
@@ -204,18 +211,12 @@ func LoadSubscribeServerConfig() (SubscriptionConfig, error) {
 		log.Error().Msg("Server is required but is not configured")
 		return SubscriptionConfig{}, errors.New("server is required but is not set in viper config")
 	}
-	var configItems = []string{"esp-msh-root-topic", "signalk-root-topic", "cerbo-root-topic", "username", "password", "cafile", "repost", "repost-root-topic", "publish-timeout"}
+	var configItems = []string{"username", "password", "cafile", "repost", "repost-root-topic", "publish-timeout"}
 	for _, confItem := range configItems {
 		v, ok = subscriptionMap[confItem]
 		if ok {
 			log.Debug().Msgf("Setting %v: %v", confItem, v)
 			switch confItem {
-			case "esp-msh-root-topic":
-				subConf.ESPMSHRootTopic = v
-			case "signalk-root-topic":
-				subConf.SignalKRootTopic = v
-			case "cerbo-root-topic":
-				subConf.CerboRootTopic = v
 			case "username":
 				subConf.Username = v
 			case "password":
@@ -248,6 +249,67 @@ func LoadSubscribeServerConfig() (SubscriptionConfig, error) {
 		} else {
 			log.Trace().Msgf("%v not found. Continuing", confItem)
 		}
+	}
+
+	if viper.IsSet("subscription.bleTopics") {
+		subConf.BLETopics = viper.GetStringSlice("subscription.bleTopics")
+		log.Debug().Msgf("BLE Topics: %v", subConf.BLETopics)
+	} else {
+		log.Warn().Msg("BLE Topics not set")
+	}
+	if viper.IsSet("subscription.phyTopics") {
+		subConf.PHYTopics = viper.GetStringSlice("subscription.phyTopics")
+		log.Debug().Msgf("PHY Topics: %v", subConf.PHYTopics)
+	} else {
+		log.Warn().Msg("PHY Topics not set")
+	}
+	if viper.IsSet("subscription.espTopics") {
+		subConf.ESPTopics = viper.GetStringSlice("subscription.espTopics")
+		log.Debug().Msgf("ESP Topics: %v", subConf.ESPTopics)
+	} else {
+		log.Warn().Msg("ESP Topics not set")
+	}
+	if viper.IsSet("subscription.navTopics") {
+		subConf.NavTopics = viper.GetStringSlice("subscription.navTopics")
+		log.Debug().Msgf("Nav Topics: %v", subConf.NavTopics)
+	} else {
+		log.Warn().Msg("Nav Topics not set")
+	}
+	if viper.IsSet("subscription.gnssTopics") {
+		subConf.GNSSTopics = viper.GetStringSlice("subscription.gnssTopics")
+		log.Debug().Msgf("GNSS Topics: %v", subConf.GNSSTopics)
+	} else {
+		log.Warn().Msg("BLE Topics not set")
+	}
+	if viper.IsSet("subscription.steeringTopics") {
+		subConf.SteeringTopics = viper.GetStringSlice("subscription.steeringTopics")
+		log.Debug().Msgf("Steering Topics: %v", subConf.SteeringTopics)
+	} else {
+		log.Warn().Msg("BLE Topics not set")
+	}
+	if viper.IsSet("subscription.windTopics") {
+		subConf.WindTopics = viper.GetStringSlice("subscription.windTopics")
+		log.Debug().Msgf("Wind Topics: %v", subConf.WindTopics)
+	} else {
+		log.Warn().Msg("Wind Topics not set")
+	}
+	if viper.IsSet("subscription.waterTopics") {
+		subConf.WaterTopics = viper.GetStringSlice("subscription.waterTopics")
+		log.Debug().Msgf("Water Topics: %v", subConf.WaterTopics)
+	} else {
+		log.Warn().Msg("Water Topics not set")
+	}
+	if viper.IsSet("subscription.outsideTopics") {
+		subConf.OutsideTopics = viper.GetStringSlice("subscription.outsideTopics")
+		log.Debug().Msgf("Outside Topics: %v", subConf.OutsideTopics)
+	} else {
+		log.Warn().Msg("Outside Topics not set")
+	}
+	if viper.IsSet("subscription.propulsionTopics") {
+		subConf.PropulsionTopics = viper.GetStringSlice("subscription.propulsionTopics")
+		log.Debug().Msgf("Propulsion Topics: %v", subConf.PropulsionTopics)
+	} else {
+		log.Warn().Msg("Propulsion Topics not set")
 	}
 
 	if !viper.IsSet("subscription.MACtoName") {

@@ -105,7 +105,10 @@ func handleSteeringMessage(client MQTT.Client, message MQTT.Message) {
 			client := influxdb2.NewClient(SharedSubscriptionConfig.InfluxUrl, SharedSubscriptionConfig.InfluxToken)
 			writeAPI := client.WriteAPIBlocking(SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
 			p := steer.ToInfluxPoint()
-			writeAPI.WritePoint(context.Background(), p)
+			err := writeAPI.WritePoint(context.Background(), p)
+			if err != nil {
+				log.Warn().Msgf("Error writing to influx: %v", err.Error())
+			}
 			client.Close()
 			log.Trace().Msg("Wrote Point")
 			if SharedSubscriptionConfig.SteerLogEn {
