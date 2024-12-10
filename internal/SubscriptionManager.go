@@ -30,25 +30,25 @@ var ISOTimeLayout string = "2006-01-02T15:04:05.000Z"
 
 func HandleSubscriptions(subscribeconf SubscriptionConfig) {
 	SharedSubscriptionConfig = &subscribeconf
-	log.Info().Msgf("Will subscribe on server %v", subscribeconf.Host)
+	log.Info().Msgf("Will subscribe on server %v", SharedSubscriptionConfig.Host)
 	mqttOpts := MQTT.NewClientOptions()
-	mqttOpts.AddBroker(subscribeconf.Host)
-	if subscribeconf.Username != "" {
-		mqttOpts.SetUsername(subscribeconf.Username)
-		log.Debug().Msgf("Using Username: %v", subscribeconf.Username)
+	mqttOpts.AddBroker(SharedSubscriptionConfig.Host)
+	if SharedSubscriptionConfig.Username != "" {
+		mqttOpts.SetUsername(SharedSubscriptionConfig.Username)
+		log.Debug().Msgf("Using Username: %v", SharedSubscriptionConfig.Username)
 	}
-	if subscribeconf.Password != "" {
-		mqttOpts.SetPassword(subscribeconf.Password)
-		log.Trace().Msgf("Using Password: %v", subscribeconf.Password)
+	if SharedSubscriptionConfig.Password != "" {
+		mqttOpts.SetPassword(SharedSubscriptionConfig.Password)
+		log.Trace().Msgf("Using Password: %v", SharedSubscriptionConfig.Password)
 	}
-	if len(subscribeconf.CACert) > 0 {
+	if len(SharedSubscriptionConfig.CACert) > 0 {
 		log.Debug().Msg("Constructing x509 Cert Pool")
 		rootCAs, err := x509.SystemCertPool()
 		if err != nil || rootCAs == nil {
 			log.Warn().Msg("Unable to get system cert pool")
 			rootCAs = x509.NewCertPool()
 		}
-		if ok := rootCAs.AppendCertsFromPEM(subscribeconf.CACert); !ok {
+		if ok := rootCAs.AppendCertsFromPEM(SharedSubscriptionConfig.CACert); !ok {
 			log.Warn().Msg("No certs appended, using system certs only")
 		}
 
@@ -69,60 +69,6 @@ func HandleSubscriptions(subscribeconf SubscriptionConfig) {
 		log.Warn().Msgf("Error Connecting to host: %v", token.Error())
 		return
 	}
-	if SharedSubscriptionConfig.InfluxEnabled {
-		log.Info().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
-			SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
-	}
-	if subscribeconf.BLESubEn {
-		for _, topic := range subscribeconf.BLETopics {
-			addSubscription(topic, OnBLETemperatureMessage, mqttClient)
-		}
-	}
-	if subscribeconf.PHYSubEn {
-		for _, topic := range subscribeconf.PHYTopics {
-			addSubscription(topic, OnPHYTemperatureMessage, mqttClient)
-		}
-	}
-	if subscribeconf.ESPSubEn {
-		for _, topic := range subscribeconf.ESPTopics {
-			addSubscription(topic, OnESPStatusMessage, mqttClient)
-		}
-	}
-	if subscribeconf.NavSubEn {
-		for _, topic := range subscribeconf.NavTopics {
-			addSubscription(topic, OnNavigationMessage, mqttClient)
-		}
-	}
-	if subscribeconf.GNSSSubEn {
-		for _, topic := range subscribeconf.GNSSTopics {
-			addSubscription(topic, OnGNSSMessage, mqttClient)
-		}
-	}
-	if subscribeconf.SteerSubEn {
-		for _, topic := range subscribeconf.SteeringTopics {
-			addSubscription(topic, OnSteeringMessage, mqttClient)
-		}
-	}
-	if subscribeconf.WindSubEn {
-		for _, topic := range subscribeconf.WindTopics {
-			addSubscription(topic, OnWindMessage, mqttClient)
-		}
-	}
-	if subscribeconf.WaterSubEn {
-		for _, topic := range subscribeconf.WaterTopics {
-			addSubscription(topic, OnWaterMessage, mqttClient)
-		}
-	}
-	if subscribeconf.OutsideSubEn {
-		for _, topic := range subscribeconf.OutsideTopics {
-			addSubscription(topic, OnOutsideMessage, mqttClient)
-		}
-	}
-	if subscribeconf.PropSubEn {
-		for _, topic := range subscribeconf.PropulsionTopics {
-			addSubscription(topic, OnPropulsionMessage, mqttClient)
-		}
-	}
 }
 
 func addSubscription(topic string, target MQTT.MessageHandler, mqttClient MQTT.Client) {
@@ -141,10 +87,70 @@ func onConnectionLost(client MQTT.Client, err error) {
 	log.Warn().Msgf("Connection Lost! %v", err.Error())
 }
 
+// This function gets called when a connection is successful
+// In the event of a reconnect scenario we can resubscribe to topics here
 func onConnect(client MQTT.Client) {
 	log.Info().Msg("Connected!")
+	subscribeToTopics(client)
 }
 
 func onReconnect(client MQTT.Client, opts *MQTT.ClientOptions) {
 	log.Warn().Msg("Attempting to reconnect")
+}
+
+func subscribeToTopics(mqttClient MQTT.Client) {
+	if SharedSubscriptionConfig.InfluxEnabled {
+		log.Info().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
+			SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+	}
+	if SharedSubscriptionConfig.BLESubEn {
+		for _, topic := range SharedSubscriptionConfig.BLETopics {
+			addSubscription(topic, OnBLETemperatureMessage, mqttClient)
+		}
+	}
+	if SharedSubscriptionConfig.PHYSubEn {
+		for _, topic := range SharedSubscriptionConfig.PHYTopics {
+			addSubscription(topic, OnPHYTemperatureMessage, mqttClient)
+		}
+	}
+	if SharedSubscriptionConfig.ESPSubEn {
+		for _, topic := range SharedSubscriptionConfig.ESPTopics {
+			addSubscription(topic, OnESPStatusMessage, mqttClient)
+		}
+	}
+	if SharedSubscriptionConfig.NavSubEn {
+		for _, topic := range SharedSubscriptionConfig.NavTopics {
+			addSubscription(topic, OnNavigationMessage, mqttClient)
+		}
+	}
+	if SharedSubscriptionConfig.GNSSSubEn {
+		for _, topic := range SharedSubscriptionConfig.GNSSTopics {
+			addSubscription(topic, OnGNSSMessage, mqttClient)
+		}
+	}
+	if SharedSubscriptionConfig.SteerSubEn {
+		for _, topic := range SharedSubscriptionConfig.SteeringTopics {
+			addSubscription(topic, OnSteeringMessage, mqttClient)
+		}
+	}
+	if SharedSubscriptionConfig.WindSubEn {
+		for _, topic := range SharedSubscriptionConfig.WindTopics {
+			addSubscription(topic, OnWindMessage, mqttClient)
+		}
+	}
+	if SharedSubscriptionConfig.WaterSubEn {
+		for _, topic := range SharedSubscriptionConfig.WaterTopics {
+			addSubscription(topic, OnWaterMessage, mqttClient)
+		}
+	}
+	if SharedSubscriptionConfig.OutsideSubEn {
+		for _, topic := range SharedSubscriptionConfig.OutsideTopics {
+			addSubscription(topic, OnOutsideMessage, mqttClient)
+		}
+	}
+	if SharedSubscriptionConfig.PropSubEn {
+		for _, topic := range SharedSubscriptionConfig.PropulsionTopics {
+			addSubscription(topic, OnPropulsionMessage, mqttClient)
+		}
+	}
 }

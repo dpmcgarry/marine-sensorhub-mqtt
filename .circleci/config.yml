@@ -67,6 +67,12 @@ jobs:
           name: Copy Sample Config to deb
           command: cp ~/project/marine-sensorhub-mqtt.conf ~/project/deb/marine-sensorhub-mqtt/etc/marine-sensorhub-mqtt.conf
       - run:
+          name: Set Build Version and Time
+          command: |
+            BUILDDT="$(date +"%Y-%m-%dT%H:%M:%S%Z" -u)"
+            sed -e 's/%VER%/${PACKAGE_BASE_VERSION}${CIRCLE_BUILD_NUM}/g;s/%BUILDTIME%/${BUILDDT}/g' ~/project/cmd/root.go | tee ~/project/cmd/foo.go
+            mv ~/project/cmd/foo.go ~/project/cmd/root.go
+      - run:
           name: Build amd64 deb package
           command: |
             sed -e "s/%VER%/${PACKAGE_BASE_VERSION}${CIRCLE_BUILD_NUM}/g" ~/project/deb/control.amd64 | tee ~/project/deb/marine-sensorhub-mqtt/DEBIAN/control
