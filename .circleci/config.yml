@@ -1,13 +1,13 @@
 version: 2.1
 orbs:
-  aws-cli: circleci/aws-cli@5.1.1
+  aws-cli: circleci/aws-cli@5.1.2 
 jobs:
   build:
     environment:
       AWS_REGION: us-east-1
       PACKAGE_BASE_VERSION: 1.0.
     docker:
-      - image: cimg/go:1.23.3
+      - image: cimg/go:1.23.4
     resource_class: dizon/onprem
     steps:
       - checkout
@@ -38,6 +38,12 @@ jobs:
           name: Create the ~/build/amd64 directory if it doesn't exist
           command: mkdir -p ~/build/amd64
       - run:
+          name: Set Build Version and Time
+          command: |
+            BUILDDT="$(date +"%Y-%m-%dT%H:%M:%S%Z" -u)"
+            sed -e 's/%VER%/${PACKAGE_BASE_VERSION}${CIRCLE_BUILD_NUM}/g;s/%BUILDTIME%/${BUILDDT}/g' ~/project/cmd/root.go | tee ~/project/cmd/foo.go
+            mv ~/project/cmd/foo.go ~/project/cmd/root.go
+      - run:
           name: Build amd64 executable
           command: GOOS=linux GOARCH=amd64 go build -o ~/build/amd64 ./...
       - run:
@@ -66,12 +72,6 @@ jobs:
       - run:
           name: Copy Sample Config to deb
           command: cp ~/project/marine-sensorhub-mqtt.conf ~/project/deb/marine-sensorhub-mqtt/etc/marine-sensorhub-mqtt.conf
-      - run:
-          name: Set Build Version and Time
-          command: |
-            BUILDDT="$(date +"%Y-%m-%dT%H:%M:%S%Z" -u)"
-            sed -e 's/%VER%/${PACKAGE_BASE_VERSION}${CIRCLE_BUILD_NUM}/g;s/%BUILDTIME%/${BUILDDT}/g' ~/project/cmd/root.go | tee ~/project/cmd/foo.go
-            mv ~/project/cmd/foo.go ~/project/cmd/root.go
       - run:
           name: Build amd64 deb package
           command: |
