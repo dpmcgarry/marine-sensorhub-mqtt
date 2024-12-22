@@ -34,6 +34,10 @@ func KelvinToFarenheit(tempk float64) float64 {
 	return (tempk-273.15)*1.8 + 32
 }
 
+func KelvinToCelsius(tempk float64) float64 {
+	return (tempk - 275.15)
+}
+
 func MillibarToInHg(mb float64) float64 {
 	return mb / 33.8639
 }

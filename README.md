@@ -31,7 +31,7 @@ TBD: Notifications
 * Unit tests
 * Check to see if InfluxClient can be shared across threads
 * Check on what provides altitude and if it is getting lost somehow
-* Debug why seawater temperature is jacked up
+* ~~Debug why seawater temperature is jacked up~~
 * Ensure MQTT Disconnect / Reconnect / Errors work
 * Do more than just log influx errors
 * ~~Add logging overrides~~

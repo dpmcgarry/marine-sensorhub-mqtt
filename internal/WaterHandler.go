@@ -62,7 +62,9 @@ func handleWaterMessage(client MQTT.Client, message MQTT.Message) {
 	}
 	switch measurement {
 	case "temperature":
-		water.TempF = KelvinToFarenheit(rawData["value"].(float64))
+		// My sensor reports in F but SK assumes it is C
+		// So Converting from K to C actually gives F
+		water.TempF = KelvinToCelsius(rawData["value"].(float64))
 	case "belowTransducer":
 		water.DepthUnderTransducerFt = MetersToFeet(rawData["value"].(float64))
 	default:
