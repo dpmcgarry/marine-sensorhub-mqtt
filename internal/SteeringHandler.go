@@ -91,7 +91,7 @@ func handleSteeringMessage(client MQTT.Client, message MQTT.Message) {
 				measurement = "autopilotState"
 			}
 			PublishClientMessage(client,
-				SharedSubscriptionConfig.RepostRootTopic+"vessel/steering/"+steer.Source+"/"+measurement, steer.ToJSON())
+				SharedSubscriptionConfig.RepostRootTopic+"vessel/steering/"+steer.Source+"/"+measurement, steer.ToJSON(), true)
 		}
 		if SharedSubscriptionConfig.InfluxEnabled {
 			log.Trace().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,

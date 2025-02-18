@@ -62,7 +62,7 @@ func handlePHYTemperatureMessage(client MQTT.Client, message MQTT.Message) {
 	}
 	phyTemp.LogJSON()
 	if SharedSubscriptionConfig.Repost {
-		PublishClientMessage(client, SharedSubscriptionConfig.RepostRootTopic+"rtd/temperature/"+phyTemp.Location, phyTemp.ToJSON())
+		PublishClientMessage(client, SharedSubscriptionConfig.RepostRootTopic+"rtd/temperature/"+phyTemp.Location, phyTemp.ToJSON(), true)
 	}
 	if SharedSubscriptionConfig.InfluxEnabled {
 		log.Trace().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,

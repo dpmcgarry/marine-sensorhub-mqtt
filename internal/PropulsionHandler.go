@@ -125,7 +125,7 @@ func handlePropulsionMessage(client MQTT.Client, message MQTT.Message) {
 		prop.LogJSON()
 		if SharedSubscriptionConfig.Repost {
 			PublishClientMessage(client,
-				SharedSubscriptionConfig.RepostRootTopic+"vessel/propulsion/"+prop.Source+"/"+measurement, prop.ToJSON())
+				SharedSubscriptionConfig.RepostRootTopic+"vessel/propulsion/"+prop.Source+"/"+measurement, prop.ToJSON(), true)
 		}
 		if SharedSubscriptionConfig.InfluxEnabled {
 			log.Trace().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,

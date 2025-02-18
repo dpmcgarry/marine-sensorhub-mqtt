@@ -73,7 +73,7 @@ func handleESPStatusMessage(client MQTT.Client, message MQTT.Message) {
 
 	espStatus.LogJSON()
 	if SharedSubscriptionConfig.Repost {
-		PublishClientMessage(client, SharedSubscriptionConfig.RepostRootTopic+"esp/status/"+espStatus.Location, espStatus.ToJSON())
+		PublishClientMessage(client, SharedSubscriptionConfig.RepostRootTopic+"esp/status/"+espStatus.Location, espStatus.ToJSON(), true)
 	}
 	if SharedSubscriptionConfig.InfluxEnabled {
 		log.Trace().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,

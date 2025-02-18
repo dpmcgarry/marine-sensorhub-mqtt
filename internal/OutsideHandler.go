@@ -83,7 +83,7 @@ func handleOutsideMessage(client MQTT.Client, message MQTT.Message) {
 		out.LogJSON()
 		if SharedSubscriptionConfig.Repost {
 			PublishClientMessage(client,
-				SharedSubscriptionConfig.RepostRootTopic+"vessel/environment/outside/"+out.Source+"/"+measurement, out.ToJSON())
+				SharedSubscriptionConfig.RepostRootTopic+"vessel/environment/outside/"+out.Source+"/"+measurement, out.ToJSON(), true)
 		}
 		if SharedSubscriptionConfig.InfluxEnabled {
 			log.Trace().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,

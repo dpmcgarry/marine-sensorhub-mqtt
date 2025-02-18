@@ -87,7 +87,7 @@ func handleWindMessage(client MQTT.Client, message MQTT.Message) {
 		wind.LogJSON()
 		if SharedSubscriptionConfig.Repost {
 			PublishClientMessage(client,
-				SharedSubscriptionConfig.RepostRootTopic+"vessel/environment/wind/"+wind.Source+"/"+measurement, wind.ToJSON())
+				SharedSubscriptionConfig.RepostRootTopic+"vessel/environment/wind/"+wind.Source+"/"+measurement, wind.ToJSON(), true)
 		}
 		if SharedSubscriptionConfig.InfluxEnabled {
 			log.Trace().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,

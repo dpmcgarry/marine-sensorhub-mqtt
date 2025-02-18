@@ -83,7 +83,7 @@ func handleWaterMessage(client MQTT.Client, message MQTT.Message) {
 		water.LogJSON()
 		if SharedSubscriptionConfig.Repost {
 			PublishClientMessage(client,
-				SharedSubscriptionConfig.RepostRootTopic+"vessel/environment/water/"+water.Source+"/"+measurement, water.ToJSON())
+				SharedSubscriptionConfig.RepostRootTopic+"vessel/environment/water/"+water.Source+"/"+measurement, water.ToJSON(), true)
 		}
 		if SharedSubscriptionConfig.InfluxEnabled {
 			log.Trace().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,

@@ -64,7 +64,7 @@ func handleBLETemperatureMessage(client MQTT.Client, message MQTT.Message) {
 	}
 	bleTemp.LogJSON()
 	if SharedSubscriptionConfig.Repost {
-		PublishClientMessage(client, SharedSubscriptionConfig.RepostRootTopic+"ble/temperature/"+bleTemp.Location, bleTemp.ToJSON())
+		PublishClientMessage(client, SharedSubscriptionConfig.RepostRootTopic+"ble/temperature/"+bleTemp.Location, bleTemp.ToJSON(), true)
 	}
 	if SharedSubscriptionConfig.InfluxEnabled {
 		log.Trace().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,

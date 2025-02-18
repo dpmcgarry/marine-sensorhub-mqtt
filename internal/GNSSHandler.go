@@ -100,7 +100,7 @@ func handleGNSSMessage(client MQTT.Client, message MQTT.Message) {
 		gnss.LogJSON()
 		if SharedSubscriptionConfig.Repost {
 			PublishClientMessage(client,
-				SharedSubscriptionConfig.RepostRootTopic+"vessel/gnss/"+gnss.Source+"/"+measurement, gnss.ToJSON())
+				SharedSubscriptionConfig.RepostRootTopic+"vessel/gnss/"+gnss.Source+"/"+measurement, gnss.ToJSON(), true)
 		}
 		if SharedSubscriptionConfig.InfluxEnabled {
 			log.Trace().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,

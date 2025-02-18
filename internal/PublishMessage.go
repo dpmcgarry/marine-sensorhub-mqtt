@@ -19,6 +19,7 @@ package internal
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"strings"
 	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
@@ -69,7 +70,11 @@ func PublishMessage(publishConf PublishConfig, serverConf MQTTDestination) {
 	client.Disconnect(uint(publishConf.DisconnectTimeout))
 }
 
-func PublishClientMessage(client MQTT.Client, topic string, messagedata string) {
+func PublishClientMessage(client MQTT.Client, topic string, messagedata string, strip bool) {
+	if strip {
+		log.Trace().Msg("Will strip the topic")
+		topic = strings.ReplaceAll(topic, " ", "")
+	}
 	log.Trace().Msgf("Will publish to topic: %v", topic)
 	log.Trace().Msgf("Will publish message: %v", messagedata)
 	token := client.Publish(topic, byte(0), false, messagedata)
