@@ -94,7 +94,7 @@ func handleWaterMessage(client MQTT.Client, message MQTT.Message) {
 			}
 			// Sharing a client across threads did not seem to work
 			// So will create a client each time for now
-			client := influxdb2.NewClient(SharedSubscriptionConfig.InfluxUrl, SharedSubscriptionConfig.InfluxToken)
+			client := influxdb2.NewClientWithOptions(SharedSubscriptionConfig.InfluxUrl, SharedSubscriptionConfig.InfluxToken, influxdb2.DefaultOptions().SetHTTPClient(SharedInfluxHttpClient))
 			writeAPI := client.WriteAPIBlocking(SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
 			p := water.ToInfluxPoint()
 			err := writeAPI.WritePoint(context.Background(), p)
