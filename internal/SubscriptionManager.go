@@ -25,12 +25,14 @@ import (
 	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
+	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/rs/zerolog/log"
 )
 
 var SharedSubscriptionConfig *SubscriptionConfig
 var ISOTimeLayout string = "2006-01-02T15:04:05.000Z"
 var SharedInfluxHttpClient *http.Client
+var SharedInfluxClient influxdb2.Client
 
 func HandleSubscriptions(subscribeconf SubscriptionConfig) {
 	SharedSubscriptionConfig = &subscribeconf
@@ -51,7 +53,9 @@ func HandleSubscriptions(subscribeconf SubscriptionConfig) {
 			IdleConnTimeout:     90 * time.Second,
 		},
 	}
-	_ = SharedInfluxHttpClient
+	SharedInfluxClient := influxdb2.NewClientWithOptions(SharedSubscriptionConfig.InfluxUrl, SharedSubscriptionConfig.InfluxToken, influxdb2.DefaultOptions().SetHTTPClient(SharedInfluxHttpClient))
+	_ = SharedInfluxClient
+	defer SharedInfluxClient.Close()
 	log.Info().Msgf("Will subscribe on server %v", SharedSubscriptionConfig.Host)
 	mqttOpts := MQTT.NewClientOptions()
 	mqttOpts.AddBroker(SharedSubscriptionConfig.Host)
