@@ -51,6 +51,7 @@ func HandleSubscriptions(subscribeconf SubscriptionConfig) {
 			IdleConnTimeout:     90 * time.Second,
 		},
 	}
+	_ = SharedInfluxHttpClient
 	log.Info().Msgf("Will subscribe on server %v", SharedSubscriptionConfig.Host)
 	mqttOpts := MQTT.NewClientOptions()
 	mqttOpts.AddBroker(SharedSubscriptionConfig.Host)
