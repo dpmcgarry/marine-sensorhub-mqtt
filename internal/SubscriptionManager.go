@@ -55,7 +55,6 @@ func HandleSubscriptions(subscribeconf SubscriptionConfig) {
 	}
 	SharedInfluxClient := influxdb2.NewClientWithOptions(SharedSubscriptionConfig.InfluxUrl, SharedSubscriptionConfig.InfluxToken, influxdb2.DefaultOptions().SetHTTPClient(SharedInfluxHttpClient))
 	_ = SharedInfluxClient
-	defer SharedInfluxClient.Close()
 	log.Info().Msgf("Will subscribe on server %v", SharedSubscriptionConfig.Host)
 	mqttOpts := MQTT.NewClientOptions()
 	mqttOpts.AddBroker(SharedSubscriptionConfig.Host)
@@ -95,6 +94,7 @@ func HandleSubscriptions(subscribeconf SubscriptionConfig) {
 		log.Warn().Msgf("Error Connecting to host: %v", token.Error())
 		return
 	}
+	defer SharedInfluxClient.Close()
 }
 
 func addSubscription(topic string, target MQTT.MessageHandler, mqttClient MQTT.Client) {
