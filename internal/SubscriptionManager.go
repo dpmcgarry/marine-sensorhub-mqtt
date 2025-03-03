@@ -19,17 +19,46 @@ package internal
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"net"
+	"net/http"
 	"net/url"
+	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
+	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
+	"github.com/influxdata/influxdb-client-go/v2/api"
 	"github.com/rs/zerolog/log"
 )
 
 var SharedSubscriptionConfig *SubscriptionConfig
 var ISOTimeLayout string = "2006-01-02T15:04:05.000Z"
+var SharedInfluxWriteAPI api.WriteAPIBlocking
 
 func HandleSubscriptions(subscribeconf SubscriptionConfig) {
 	SharedSubscriptionConfig = &subscribeconf
+	var influxClient influxdb2.Client
+	if SharedSubscriptionConfig.InfluxEnabled {
+		// Create HTTP client - for the future to allow TLS override
+		influxHttpClient := &http.Client{
+			Timeout: time.Second * time.Duration(60),
+			Transport: &http.Transport{
+				DialContext: (&net.Dialer{
+					Timeout: 5 * time.Second,
+				}).DialContext,
+				TLSHandshakeTimeout: 5 * time.Second,
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: false,
+				},
+				MaxIdleConns:        100,
+				MaxIdleConnsPerHost: 100,
+				IdleConnTimeout:     90 * time.Second,
+			},
+		}
+		log.Info().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
+			SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+		influxClient = influxdb2.NewClientWithOptions(SharedSubscriptionConfig.InfluxUrl, SharedSubscriptionConfig.InfluxToken, influxdb2.DefaultOptions().SetHTTPClient(influxHttpClient))
+		SharedInfluxWriteAPI = influxClient.WriteAPIBlocking(SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+	}
 	log.Info().Msgf("Will subscribe on server %v", SharedSubscriptionConfig.Host)
 	mqttOpts := MQTT.NewClientOptions()
 	mqttOpts.AddBroker(SharedSubscriptionConfig.Host)
@@ -68,6 +97,9 @@ func HandleSubscriptions(subscribeconf SubscriptionConfig) {
 	if token := mqttClient.Connect(); token.Wait() && token.Error() != nil {
 		log.Warn().Msgf("Error Connecting to host: %v", token.Error())
 		return
+	}
+	if SharedSubscriptionConfig.InfluxEnabled {
+		defer influxClient.Close()
 	}
 }
 

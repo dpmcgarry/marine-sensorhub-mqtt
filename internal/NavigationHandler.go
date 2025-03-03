@@ -139,22 +139,11 @@ func handleNavigationMessage(client MQTT.Client, message MQTT.Message) {
 				SharedSubscriptionConfig.RepostRootTopic+"vessel/navigation/"+nav.Source+"/"+measurement, nav.ToJSON(), true)
 		}
 		if SharedSubscriptionConfig.InfluxEnabled {
-			log.Trace().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
-				SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
-			if SharedSubscriptionConfig.NavLogEn {
-				log.Debug().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
-					SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
-			}
-			// Sharing a client across threads did not seem to work
-			// So will create a client each time for now
-			client := influxdb2.NewClient(SharedSubscriptionConfig.InfluxUrl, SharedSubscriptionConfig.InfluxToken)
-			writeAPI := client.WriteAPIBlocking(SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
 			p := nav.ToInfluxPoint()
-			err := writeAPI.WritePoint(context.Background(), p)
+			err := SharedInfluxWriteAPI.WritePoint(context.Background(), p)
 			if err != nil {
 				log.Warn().Msgf("Error writing to influx: %v", err.Error())
 			}
-			client.Close()
 			log.Trace().Msg("Wrote Point")
 			if SharedSubscriptionConfig.NavLogEn {
 				log.Debug().Msg("Wrote Point")
