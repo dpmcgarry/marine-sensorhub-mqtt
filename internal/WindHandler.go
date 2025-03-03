@@ -90,15 +90,8 @@ func handleWindMessage(client MQTT.Client, message MQTT.Message) {
 				SharedSubscriptionConfig.RepostRootTopic+"vessel/environment/wind/"+wind.Source+"/"+measurement, wind.ToJSON(), true)
 		}
 		if SharedSubscriptionConfig.InfluxEnabled {
-			log.Trace().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
-				SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
-			if SharedSubscriptionConfig.WindLogEn {
-				log.Debug().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
-					SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
-			}
-			writeAPI := SharedInfluxClient.WriteAPIBlocking(SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
 			p := wind.ToInfluxPoint()
-			err := writeAPI.WritePoint(context.Background(), p)
+			err := SharedInfluxWriteAPI.WritePoint(context.Background(), p)
 			if err != nil {
 				log.Warn().Msgf("Error writing to influx: %v", err.Error())
 			}

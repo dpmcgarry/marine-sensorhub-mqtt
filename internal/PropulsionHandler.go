@@ -128,15 +128,8 @@ func handlePropulsionMessage(client MQTT.Client, message MQTT.Message) {
 				SharedSubscriptionConfig.RepostRootTopic+"vessel/propulsion/"+prop.Source+"/"+measurement, prop.ToJSON(), true)
 		}
 		if SharedSubscriptionConfig.InfluxEnabled {
-			log.Trace().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
-				SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
-			if SharedSubscriptionConfig.PropLogEn {
-				log.Debug().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
-					SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
-			}
-			writeAPI := SharedInfluxClient.WriteAPIBlocking(SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
 			p := prop.ToInfluxPoint()
-			err := writeAPI.WritePoint(context.Background(), p)
+			err := SharedInfluxWriteAPI.WritePoint(context.Background(), p)
 			if err != nil {
 				log.Warn().Msgf("Error writing to influx: %v", err.Error())
 			}

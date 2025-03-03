@@ -26,35 +26,39 @@ import (
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
+	"github.com/influxdata/influxdb-client-go/v2/api"
 	"github.com/rs/zerolog/log"
 )
 
 var SharedSubscriptionConfig *SubscriptionConfig
 var ISOTimeLayout string = "2006-01-02T15:04:05.000Z"
-var SharedInfluxHttpClient *http.Client
-var SharedInfluxClient influxdb2.Client
+var SharedInfluxWriteAPI api.WriteAPIBlocking
 
 func HandleSubscriptions(subscribeconf SubscriptionConfig) {
 	SharedSubscriptionConfig = &subscribeconf
-
-	// Create HTTP client
-	SharedInfluxHttpClient := &http.Client{
-		Timeout: time.Second * time.Duration(60),
-		Transport: &http.Transport{
-			DialContext: (&net.Dialer{
-				Timeout: 5 * time.Second,
-			}).DialContext,
-			TLSHandshakeTimeout: 5 * time.Second,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: false,
+	var influxClient influxdb2.Client
+	if SharedSubscriptionConfig.InfluxEnabled {
+		// Create HTTP client - for the future to allow TLS override
+		influxHttpClient := &http.Client{
+			Timeout: time.Second * time.Duration(60),
+			Transport: &http.Transport{
+				DialContext: (&net.Dialer{
+					Timeout: 5 * time.Second,
+				}).DialContext,
+				TLSHandshakeTimeout: 5 * time.Second,
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: false,
+				},
+				MaxIdleConns:        100,
+				MaxIdleConnsPerHost: 100,
+				IdleConnTimeout:     90 * time.Second,
 			},
-			MaxIdleConns:        100,
-			MaxIdleConnsPerHost: 100,
-			IdleConnTimeout:     90 * time.Second,
-		},
+		}
+		log.Info().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
+			SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
+		influxClient = influxdb2.NewClientWithOptions(SharedSubscriptionConfig.InfluxUrl, SharedSubscriptionConfig.InfluxToken, influxdb2.DefaultOptions().SetHTTPClient(influxHttpClient))
+		SharedInfluxWriteAPI = influxClient.WriteAPIBlocking(SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
 	}
-	SharedInfluxClient := influxdb2.NewClientWithOptions(SharedSubscriptionConfig.InfluxUrl, SharedSubscriptionConfig.InfluxToken, influxdb2.DefaultOptions().SetHTTPClient(SharedInfluxHttpClient))
-	_ = SharedInfluxClient
 	log.Info().Msgf("Will subscribe on server %v", SharedSubscriptionConfig.Host)
 	mqttOpts := MQTT.NewClientOptions()
 	mqttOpts.AddBroker(SharedSubscriptionConfig.Host)
@@ -94,7 +98,9 @@ func HandleSubscriptions(subscribeconf SubscriptionConfig) {
 		log.Warn().Msgf("Error Connecting to host: %v", token.Error())
 		return
 	}
-	defer SharedInfluxClient.Close()
+	if SharedSubscriptionConfig.InfluxEnabled {
+		defer influxClient.Close()
+	}
 }
 
 func addSubscription(topic string, target MQTT.MessageHandler, mqttClient MQTT.Client) {

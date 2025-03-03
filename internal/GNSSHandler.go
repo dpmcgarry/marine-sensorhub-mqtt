@@ -103,15 +103,8 @@ func handleGNSSMessage(client MQTT.Client, message MQTT.Message) {
 				SharedSubscriptionConfig.RepostRootTopic+"vessel/gnss/"+gnss.Source+"/"+measurement, gnss.ToJSON(), true)
 		}
 		if SharedSubscriptionConfig.InfluxEnabled {
-			log.Trace().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
-				SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
-			if SharedSubscriptionConfig.GNSSLogEn {
-				log.Debug().Msgf("InfluxDB is enabled. URL: %v Org: %v Bucket:%v", SharedSubscriptionConfig.InfluxUrl,
-					SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
-			}
-			writeAPI := SharedInfluxClient.WriteAPIBlocking(SharedSubscriptionConfig.InfluxOrg, SharedSubscriptionConfig.InfluxBucket)
 			p := gnss.ToInfluxPoint()
-			err := writeAPI.WritePoint(context.Background(), p)
+			err := SharedInfluxWriteAPI.WritePoint(context.Background(), p)
 			if err != nil {
 				log.Warn().Msgf("Error writing to influx: %v", err.Error())
 			}

@@ -29,7 +29,7 @@ TBD: Notifications
 * Look at having two log files (Warn+ and Info/Debug)
 * Add a message archiving capability
 * Unit tests
-* Check to see if InfluxClient can be shared across threads
+* ~~Check to see if InfluxClient can be shared across threads~~
 * Check on what provides altitude and if it is getting lost somehow
 * ~~Debug why seawater temperature is jacked up~~
 * Ensure MQTT Disconnect / Reconnect / Errors work
