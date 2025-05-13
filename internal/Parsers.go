@@ -48,7 +48,9 @@ func ParseFloat64(a any) (float64, error) {
 	default:
 		v := reflect.ValueOf(a)
 		v = reflect.Indirect(v)
-		if v.Type().ConvertibleTo(floatType) {
+		if !v.IsValid() {
+			return math.NaN(), fmt.Errorf("invalid type - can't convert to float64 %v", v)
+		} else if v.Type().ConvertibleTo(floatType) {
 			fv := v.Convert(floatType)
 			return fv.Float(), nil
 		} else if v.Type().ConvertibleTo(stringType) {
