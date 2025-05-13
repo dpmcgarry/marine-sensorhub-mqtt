@@ -134,7 +134,8 @@ func handleNavigationMessage(client MQTT.Client, message MQTT.Message) {
 
 			floatTmp, err = ParseFloat64(postmp["altitude"])
 			if err != nil {
-				log.Warn().Msgf("Error parsing float64: %v", err.Error())
+				// Altitude isn't always a thing so just leaving this as a trace
+				log.Trace().Msgf("Error parsing float64: %v", err.Error())
 			} else {
 				nav.Alt = MetersToFeet(floatTmp)
 			}
