@@ -21,6 +21,8 @@ import (
 	"math"
 	"reflect"
 	"strconv"
+
+	"github.com/rs/zerolog/log"
 )
 
 func ParseFloat64(a any) (float64, error) {
@@ -47,7 +49,9 @@ func ParseFloat64(a any) (float64, error) {
 		return strconv.ParseFloat(i, 64)
 	default:
 		v := reflect.ValueOf(a)
+		log.Debug().Msgf("ValueOf: %v", v)
 		v = reflect.Indirect(v)
+		log.Debug().Msgf("Indirect: %v", v)
 		if !v.IsValid() {
 			return math.NaN(), fmt.Errorf("can't convert %v to float64", v.Type())
 		} else if v.Type().ConvertibleTo(floatType) {
