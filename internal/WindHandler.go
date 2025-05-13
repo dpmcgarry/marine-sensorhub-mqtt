@@ -1,5 +1,5 @@
 /*
-Copyright © 2024 Don P. McGarry
+Copyright © 2025 Don P. McGarry
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -57,20 +57,52 @@ func handleWindMessage(client MQTT.Client, message MQTT.Message) {
 		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
 	}
 	wind := Wind{}
-	wind.Source = rawData["$source"].(string)
-	wind.Timestamp, err = time.Parse(ISOTimeLayout, rawData["timestamp"].(string))
+	var strtmp string
+	strtmp, err = ParseString(rawData["$source"])
 	if err != nil {
-		log.Warn().Msgf("Error parsing time string: %v", err.Error())
+		log.Warn().Msgf("Error parsing string: %v", err.Error())
+	} else {
+		wind.Source = strtmp
 	}
+	strtmp, err = ParseString(rawData["timestamp"])
+	if err != nil {
+		log.Warn().Msgf("Error parsing string: %v", err.Error())
+	} else {
+		wind.Timestamp, err = time.Parse(ISOTimeLayout, strtmp)
+		if err != nil {
+			log.Warn().Msgf("Error parsing time string: %v", err.Error())
+		}
+	}
+	var floatTmp float64
 	switch measurement {
 	case "speedOverGround":
-		wind.SOG = MetersPerSecondToKnots(rawData["value"].(float64))
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			wind.SOG = MetersPerSecondToKnots(floatTmp)
+		}
 	case "directionTrue":
-		wind.DirectionTrue = RadiansToDegrees(rawData["value"].(float64))
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			wind.DirectionTrue = RadiansToDegrees(floatTmp)
+		}
 	case "speedApparent":
-		wind.SpeedApp = MetersPerSecondToKnots(rawData["value"].(float64))
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			wind.SpeedApp = MetersPerSecondToKnots(floatTmp)
+		}
 	case "angleApparent":
-		wind.AngleApp = RadiansToDegrees(rawData["value"].(float64))
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			wind.AngleApp = RadiansToDegrees(floatTmp)
+		}
 	default:
 		log.Warn().Msgf("Unknown measurement %v in %v", measurement, message.Topic())
 	}

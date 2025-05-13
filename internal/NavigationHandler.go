@@ -1,5 +1,5 @@
 /*
-Copyright © 2024 Don P. McGarry
+Copyright © 2025 Don P. McGarry
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -67,55 +67,140 @@ func handleNavigationMessage(client MQTT.Client, message MQTT.Message) {
 		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
 	}
 	nav := Navigation{}
-	nav.Source = rawData["$source"].(string)
-	if strings.Contains(nav.Source, "venus.com.victronenergy.gps.") {
-		return
-	}
-	nav.Timestamp, err = time.Parse(ISOTimeLayout, rawData["timestamp"].(string))
+	var strtmp string
+	strtmp, err = ParseString(rawData["$source"])
+
 	if err != nil {
-		log.Warn().Msgf("Error parsing time string: %v", err.Error())
+		log.Warn().Msgf("Error parsing string: %v", err.Error())
+	} else {
+		nav.Source = strtmp
+		if strings.Contains(nav.Source, "venus.com.victronenergy.gps.") {
+			return
+		}
 	}
+	strtmp, err = ParseString(rawData["timestamp"])
+	if err != nil {
+		log.Warn().Msgf("Error parsing string: %v", err.Error())
+	} else {
+		nav.Timestamp, err = time.Parse(ISOTimeLayout, strtmp)
+		if err != nil {
+			log.Warn().Msgf("Error parsing time string: %v", err.Error())
+		}
+	}
+	var floatTmp float64
 	switch measurement {
 	case "headingMagnetic":
-		nav.HeadingMag = RadiansToDegrees(rawData["value"].(float64))
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			nav.HeadingMag = RadiansToDegrees(floatTmp)
+		}
+
 	case "rateOfTurn":
-		nav.ROT = RadiansToDegrees(rawData["value"].(float64))
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			nav.ROT = RadiansToDegrees(floatTmp)
+		}
+
 	case "speedOverGround":
-		nav.SOG = MetersPerSecondToKnots(rawData["value"].(float64))
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			nav.SOG = MetersPerSecondToKnots(floatTmp)
+		}
+
 	case "position":
-		postmp := rawData["value"].(map[string]any)
-		nav.Lat = postmp["latitude"].(float64)
-		nav.Lon = postmp["longitude"].(float64)
-		alt, ok := postmp["altitude"].(float64)
-		if ok {
-			nav.Alt = MetersToFeet(alt)
+		postmp, err := ParseMapString(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing map[string]: %v", err.Error())
+		} else {
+			floatTmp, err = ParseFloat64(postmp["latitude"])
+			if err != nil {
+				log.Warn().Msgf("Error parsing float64: %v", err.Error())
+			} else {
+				nav.Lat = floatTmp
+			}
+
+			floatTmp, err = ParseFloat64(postmp["longitude"])
+			if err != nil {
+				log.Warn().Msgf("Error parsing float64: %v", err.Error())
+			} else {
+				nav.Lon = floatTmp
+			}
+
+			floatTmp, err = ParseFloat64(postmp["altitude"])
+			if err != nil {
+				log.Warn().Msgf("Error parsing float64: %v", err.Error())
+			} else {
+				nav.Alt = MetersToFeet(floatTmp)
+			}
 		}
 	case "headingTrue":
-		nav.HeadingTrue = RadiansToDegrees(rawData["value"].(float64))
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			nav.HeadingTrue = RadiansToDegrees(floatTmp)
+		}
 	case "magneticVariation":
-		nav.MagVariation = RadiansToDegrees(rawData["value"].(float64))
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			nav.MagVariation = RadiansToDegrees(floatTmp)
+		}
 	case "magneticDeviation":
-		nav.MagDeviation = RadiansToDegrees(rawData["value"].(float64))
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			nav.MagDeviation = RadiansToDegrees(floatTmp)
+		}
 	case "datetime":
 		break
 	case "courseOverGroundTrue":
-		nav.COGTrue = RadiansToDegrees(rawData["value"].(float64))
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			nav.COGTrue = RadiansToDegrees(floatTmp)
+		}
 	case "attitude":
-		atttmp := rawData["value"].(map[string]any)
-		flttmp, ok := atttmp["yaw"].(float64)
-		if ok {
-			nav.Yaw = RadiansToDegrees(flttmp)
-		}
-		flttmp, ok = atttmp["pitch"].(float64)
-		if ok {
-			nav.Pitch = RadiansToDegrees(flttmp)
-		}
-		flttmp, ok = atttmp["roll"].(float64)
-		if ok {
-			nav.Roll = RadiansToDegrees(flttmp)
+		atttmp, err := ParseMapString(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing map[string]: %v", err.Error())
+		} else {
+			floatTmp, err = ParseFloat64(atttmp["yaw"])
+			if err != nil {
+				log.Warn().Msgf("Error parsing float64: %v", err.Error())
+			} else {
+				nav.Yaw = RadiansToDegrees(floatTmp)
+			}
+			floatTmp, err = ParseFloat64(atttmp["pitch"])
+			if err != nil {
+				log.Warn().Msgf("Error parsing float64: %v", err.Error())
+			} else {
+				nav.Pitch = RadiansToDegrees(floatTmp)
+			}
+
+			floatTmp, err = ParseFloat64(atttmp["roll"])
+			if err != nil {
+				log.Warn().Msgf("Error parsing float64: %v", err.Error())
+			} else {
+				nav.Roll = RadiansToDegrees(floatTmp)
+			}
 		}
 	case "speedThroughWater":
-		nav.STW = MetersPerSecondToKnots(rawData["value"].(float64))
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			nav.STW = MetersPerSecondToKnots(floatTmp)
+		}
 	case "speedThroughWaterReferenceType":
 		break
 	case "log":

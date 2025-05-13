@@ -1,5 +1,5 @@
 /*
-Copyright © 2024 Don P. McGarry
+Copyright © 2025 Don P. McGarry
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

@@ -1,5 +1,5 @@
 /*
-Copyright © 2024 Don P. McGarry
+Copyright © 2025 Don P. McGarry
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -60,26 +60,75 @@ func handleGNSSMessage(client MQTT.Client, message MQTT.Message) {
 		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
 	}
 	gnss := GNSS{}
-	gnss.Source = rawData["$source"].(string)
-	gnss.Timestamp, err = time.Parse(ISOTimeLayout, rawData["timestamp"].(string))
+	var strtmp string
+	strtmp, err = ParseString(rawData["$source"])
 	if err != nil {
-		log.Warn().Msgf("Error parsing time string: %v", err.Error())
+		log.Warn().Msgf("Error parsing string: %v", err.Error())
+	} else {
+		gnss.Source = strtmp
 	}
+	strtmp, err = ParseString(rawData["timestamp"])
+	if err != nil {
+		log.Warn().Msgf("Error parsing string: %v", err.Error())
+	} else {
+		gnss.Timestamp, err = time.Parse(ISOTimeLayout, strtmp)
+		if err != nil {
+			log.Warn().Msgf("Error parsing time string: %v", err.Error())
+		}
+	}
+	var floatTmp float64
+
 	switch measurement {
 	case "antennaAltitude":
-		gnss.AntennaAlt = rawData["value"].(float64)
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			gnss.AntennaAlt = floatTmp
+		}
 	case "satellites":
-		gnss.Satellites = int64(rawData["value"].(float64))
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			gnss.Satellites = int64(floatTmp)
+		}
 	case "horizontalDilution":
-		gnss.HozDilution = rawData["value"].(float64)
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			gnss.HozDilution = floatTmp
+		}
 	case "positionDilution":
-		gnss.PosDilution = rawData["value"].(float64)
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			gnss.PosDilution = floatTmp
+		}
+
 	case "geoidalSeparation":
-		gnss.GeoidalSep = rawData["value"].(float64)
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			gnss.GeoidalSep = floatTmp
+		}
 	case "type":
-		gnss.Type = rawData["value"].(string)
+		strtmp, err = ParseString(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing string: %v", err.Error())
+		} else {
+			gnss.Type = strtmp
+		}
 	case "methodQuality":
-		gnss.MethodQuality = rawData["value"].(string)
+		strtmp, err = ParseString(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing string: %v", err.Error())
+		} else {
+			gnss.MethodQuality = strtmp
+		}
 	case "integrity":
 		break
 	case "satellitesInView":

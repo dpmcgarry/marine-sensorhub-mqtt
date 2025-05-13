@@ -1,5 +1,5 @@
 /*
-Copyright © 2024 Don P. McGarry
+Copyright © 2025 Don P. McGarry
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -56,17 +56,39 @@ func handleOutsideMessage(client MQTT.Client, message MQTT.Message) {
 		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
 	}
 	out := Outside{}
-	out.Source = rawData["$source"].(string)
-	out.Timestamp, err = time.Parse(ISOTimeLayout, rawData["timestamp"].(string))
+	var strtmp string
+	strtmp, err = ParseString(rawData["$source"])
 	if err != nil {
-		log.Warn().Msgf("Error parsing time string: %v", err.Error())
+		log.Warn().Msgf("Error parsing string: %v", err.Error())
+	} else {
+		out.Source = strtmp
 	}
+	strtmp, err = ParseString(rawData["timestamp"])
+	if err != nil {
+		log.Warn().Msgf("Error parsing string: %v", err.Error())
+	} else {
+		out.Timestamp, err = time.Parse(ISOTimeLayout, strtmp)
+		if err != nil {
+			log.Warn().Msgf("Error parsing time string: %v", err.Error())
+		}
+	}
+	var floatTmp float64
 	switch measurement {
 	case "temperature":
-		out.TempF = KelvinToFarenheit(rawData["value"].(float64))
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			out.TempF = KelvinToFarenheit(floatTmp)
+		}
 	case "pressure":
-		out.Pressure = rawData["value"].(float64) / 100
-		out.PressureInHg = MillibarToInHg(out.Pressure)
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			out.Pressure = floatTmp / 100
+			out.PressureInHg = MillibarToInHg(out.Pressure)
+		}
 	default:
 		log.Warn().Msgf("Unknown measurement %v in %v", measurement, message.Topic())
 	}

@@ -1,5 +1,5 @@
 /*
-Copyright © 2024 Don P. McGarry
+Copyright © 2025 Don P. McGarry
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -55,18 +55,40 @@ func handleWaterMessage(client MQTT.Client, message MQTT.Message) {
 		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
 	}
 	water := Water{}
-	water.Source = rawData["$source"].(string)
-	water.Timestamp, err = time.Parse(ISOTimeLayout, rawData["timestamp"].(string))
+	var strtmp string
+	strtmp, err = ParseString(rawData["$source"])
 	if err != nil {
-		log.Warn().Msgf("Error parsing time string: %v", err.Error())
+		log.Warn().Msgf("Error parsing string: %v", err.Error())
+	} else {
+		water.Source = strtmp
 	}
+	strtmp, err = ParseString(rawData["timestamp"])
+	if err != nil {
+		log.Warn().Msgf("Error parsing string: %v", err.Error())
+	} else {
+		water.Timestamp, err = time.Parse(ISOTimeLayout, strtmp)
+		if err != nil {
+			log.Warn().Msgf("Error parsing time string: %v", err.Error())
+		}
+	}
+	var floatTmp float64
 	switch measurement {
 	case "temperature":
-		// My sensor reports in F but SK assumes it is C
-		// So Converting from K to C actually gives F
-		water.TempF = KelvinToCelsius(rawData["value"].(float64))
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			// My sensor reports in F but SK assumes it is C
+			// So Converting from K to C actually gives F
+			water.TempF = KelvinToCelsius(floatTmp)
+		}
 	case "belowTransducer":
-		water.DepthUnderTransducerFt = MetersToFeet(rawData["value"].(float64))
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			water.DepthUnderTransducerFt = MetersToFeet(floatTmp)
+		}
 	default:
 		log.Warn().Msgf("Unknown measurement %v in %v", measurement, message.Topic())
 	}

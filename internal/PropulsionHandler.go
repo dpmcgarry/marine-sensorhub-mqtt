@@ -1,5 +1,5 @@
 /*
-Copyright © 2024 Don P. McGarry
+Copyright © 2025 Don P. McGarry
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -71,44 +71,107 @@ func handlePropulsionMessage(client MQTT.Client, message MQTT.Message) {
 		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
 	}
 	prop := Propulsion{}
-	prop.Source = rawData["$source"].(string)
-	prop.Timestamp, err = time.Parse(ISOTimeLayout, rawData["timestamp"].(string))
+	var strtmp string
+	strtmp, err = ParseString(rawData["$source"])
 	if err != nil {
-		log.Warn().Msgf("Error parsing time string: %v", err.Error())
+		log.Warn().Msgf("Error parsing string: %v", err.Error())
+	} else {
+		prop.Source = strtmp
 	}
+	strtmp, err = ParseString(rawData["timestamp"])
+	if err != nil {
+		log.Warn().Msgf("Error parsing string: %v", err.Error())
+	} else {
+		prop.Timestamp, err = time.Parse(ISOTimeLayout, strtmp)
+		if err != nil {
+			log.Warn().Msgf("Error parsing time string: %v", err.Error())
+		}
+	}
+	var floatTmp float64
 	switch measurement {
 	case "revolutions":
-		prop.RPM = int64(rawData["value"].(float64)) * 60
-	case "boostPressure":
-		prop.BoostPSI = PascalToPSI(rawData["value"].(float64))
-	case "oilTemperature":
-		if isTranny {
-			prop.TransOilTempF = KelvinToFarenheit(rawData["value"].(float64))
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
 		} else {
-			prop.OilTempF = KelvinToFarenheit(rawData["value"].(float64))
+			prop.RPM = int64(floatTmp) * 60
+		}
+	case "boostPressure":
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			prop.BoostPSI = PascalToPSI(floatTmp)
+		}
+	case "oilTemperature":
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			if isTranny {
+				prop.TransOilTempF = KelvinToFarenheit(floatTmp)
+			} else {
+				prop.OilTempF = KelvinToFarenheit(floatTmp)
+			}
 		}
 	case "oilPressure":
-		if isTranny {
-			prop.TransOilPressure = PascalToPSI(rawData["value"].(float64))
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
 		} else {
-			prop.OilPressure = PascalToPSI(rawData["value"].(float64))
+			if isTranny {
+
+				prop.TransOilPressure = PascalToPSI(floatTmp)
+			} else {
+				prop.OilPressure = PascalToPSI(floatTmp)
+			}
 		}
 	case "temperature":
-		prop.CoolantTempF = KelvinToFarenheit(rawData["value"].(float64))
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			prop.CoolantTempF = KelvinToFarenheit(floatTmp)
+		}
 	case "alternatorVoltage":
-		prop.AltVoltage = rawData["value"].(float64)
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			prop.AltVoltage = floatTmp
+		}
 	case "transmission":
 		break
 	case "fuel":
 		break
 	case "rate":
-		prop.FuelRate = CubicMetersPerSecondToGallonsPerHour(rawData["value"].(float64))
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			prop.FuelRate = CubicMetersPerSecondToGallonsPerHour(floatTmp)
+		}
 	case "runTime":
-		prop.RunTime = int64(rawData["value"].(float64))
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			prop.RunTime = int64(floatTmp)
+		}
 	case "engineLoad":
-		prop.EngineLoad = rawData["value"].(float64) * 100
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			prop.EngineLoad = floatTmp * 100
+		}
 	case "engineTorque":
-		prop.EngineTorque = rawData["value"].(float64) * 100
+		floatTmp, err = ParseFloat64(rawData["value"])
+		if err != nil {
+			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+		} else {
+			prop.EngineTorque = floatTmp * 100
+		}
 	default:
 		log.Warn().Msgf("Unknown measurement %v in %v", measurement, message.Topic())
 	}
