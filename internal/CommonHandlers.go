@@ -41,6 +41,11 @@ func HandleJSONMessage(client MQTT.Client, message MQTT.Message, data SensorData
 		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
 		return
 	}
+}
+
+func SendJSONMessage(client MQTT.Client, message MQTT.Message, data SensorData) {
+	// Log message receipt
+	logEnabled := data.GetLogEnabled()
 
 	// Skip empty data
 	if data.IsEmpty() {
@@ -61,7 +66,7 @@ func HandleJSONMessage(client MQTT.Client, message MQTT.Message, data SensorData
 	// Write to InfluxDB if enabled
 	if SharedSubscriptionConfig.InfluxEnabled {
 		p := data.ToInfluxPoint()
-		err = SharedInfluxWriteAPI.WritePoint(context.Background(), p)
+		err := SharedInfluxWriteAPI.WritePoint(context.Background(), p)
 		if err != nil {
 			log.Warn().Msgf("Error writing to influx: %v", err.Error())
 		}

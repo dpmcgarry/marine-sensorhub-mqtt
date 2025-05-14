@@ -53,6 +53,8 @@ func handleBLETemperatureMessage(client MQTT.Client, message MQTT.Message) {
 			bleTemp.Location = loc
 		}
 	}
+
+	SendJSONMessage(client, message, bleTemp)
 }
 
 // ToJSON serializes the data to JSON

@@ -61,6 +61,7 @@ func handleESPStatusMessage(client MQTT.Client, message MQTT.Message) {
 			espStatus.Location = loc
 		}
 	}
+	SendJSONMessage(client, message, espStatus)
 }
 
 // ToJSON serializes the data to JSON

@@ -52,6 +52,8 @@ func handlePHYTemperatureMessage(client MQTT.Client, message MQTT.Message) {
 			phyTemp.Location = loc
 		}
 	}
+
+	SendJSONMessage(client, message, phyTemp)
 }
 
 // ToJSON serializes the data to JSON
