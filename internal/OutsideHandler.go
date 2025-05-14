@@ -17,10 +17,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package internal
 
 import (
-	"context"
 	"encoding/json"
-	"strings"
-	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
@@ -28,51 +25,36 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// Outside represents outside environment sensor data
 type Outside struct {
-	Source       string    `json:"Source,omitempty"`
-	TempF        float64   `json:"TempF,omitempty"`
-	Pressure     float64   `json:"Pressure,omitempty"`
-	PressureInHg float64   `json:"PressureInHg,omitempty"`
-	Timestamp    time.Time `json:"Timestamp,omitempty"`
+	BaseSensorData
+	TempF        float64 `json:"TempF,omitempty"`
+	Pressure     float64 `json:"Pressure,omitempty"`
+	PressureInHg float64 `json:"PressureInHg,omitempty"`
 }
 
+// OnOutsideMessage is called when an outside environment message is received
 func OnOutsideMessage(client MQTT.Client, message MQTT.Message) {
 	go handleOutsideMessage(client, message)
 }
 
+// handleOutsideMessage processes outside environment messages
 func handleOutsideMessage(client MQTT.Client, message MQTT.Message) {
-	log.Trace().Msgf("Got a message from: %v", message.Topic())
-	if SharedSubscriptionConfig.OutsideLogEn {
-		log.Info().Msgf("Got a message from: %v", message.Topic())
+	out := &Outside{}
+	HandleSensorMessage(client, message, out, processOutsideData)
+}
+
+// processOutsideData processes specific outside environment data fields
+func processOutsideData(rawData map[string]any, measurement string, data SensorData) {
+	out, ok := data.(*Outside)
+	if !ok {
+		log.Error().Msg("Failed to cast data to Outside type")
+		return
 	}
-	measurement := message.Topic()[strings.LastIndex(message.Topic(), "/")+1:]
-	log.Trace().Msgf("Got Measurement: %v", measurement)
-	if SharedSubscriptionConfig.OutsideLogEn {
-		log.Info().Msgf("Got Measurement: %v", measurement)
-	}
-	var rawData map[string]any
-	err := json.Unmarshal(message.Payload(), &rawData)
-	if err != nil {
-		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
-	}
-	out := Outside{}
-	var strtmp string
-	strtmp, err = ParseString(rawData["$source"])
-	if err != nil {
-		log.Warn().Msgf("Error parsing string: %v", err.Error())
-	} else {
-		out.Source = strtmp
-	}
-	strtmp, err = ParseString(rawData["timestamp"])
-	if err != nil {
-		log.Warn().Msgf("Error parsing string: %v", err.Error())
-	} else {
-		out.Timestamp, err = time.Parse(ISOTimeLayout, strtmp)
-		if err != nil {
-			log.Warn().Msgf("Error parsing time string: %v", err.Error())
-		}
-	}
+
+	var err error
 	var floatTmp float64
+
 	switch measurement {
 	case "temperature":
 		floatTmp, err = ParseFloat64(rawData["value"])
@@ -90,38 +72,12 @@ func handleOutsideMessage(client MQTT.Client, message MQTT.Message) {
 			out.PressureInHg = MillibarToInHg(out.Pressure)
 		}
 	default:
-		log.Warn().Msgf("Unknown measurement %v in %v", measurement, message.Topic())
-	}
-	name, ok := SharedSubscriptionConfig.N2KtoName[strings.ToLower(out.Source)]
-	if ok {
-		out.Source = name
-	} else {
-		log.Warn().Msgf("Name not found for Source %v", out.Source)
-	}
-	if out.Timestamp.IsZero() {
-		out.Timestamp = time.Now()
-	}
-	if !out.IsEmpty() {
-		out.LogJSON()
-		if SharedSubscriptionConfig.Repost {
-			PublishClientMessage(client,
-				SharedSubscriptionConfig.RepostRootTopic+"vessel/environment/outside/"+out.Source+"/"+measurement, out.ToJSON(), true)
-		}
-		if SharedSubscriptionConfig.InfluxEnabled {
-			p := out.ToInfluxPoint()
-			err := SharedInfluxWriteAPI.WritePoint(context.Background(), p)
-			if err != nil {
-				log.Warn().Msgf("Error writing to influx: %v", err.Error())
-			}
-			log.Trace().Msg("Wrote Point")
-			if SharedSubscriptionConfig.OutsideLogEn {
-				log.Debug().Msg("Wrote Point")
-			}
-		}
+		log.Warn().Msgf("Unknown measurement %v", measurement)
 	}
 }
 
-func (meas Outside) ToJSON() string {
+// ToJSON serializes the data to JSON
+func (meas *Outside) ToJSON() string {
 	jsonData, err := json.Marshal(meas)
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
@@ -129,7 +85,8 @@ func (meas Outside) ToJSON() string {
 	return string(jsonData)
 }
 
-func (meas Outside) LogJSON() {
+// LogJSON logs the JSON representation of the data
+func (meas *Outside) LogJSON() {
 	json := meas.ToJSON()
 	log.Trace().Msgf("Outside: %v", json)
 	if SharedSubscriptionConfig.OutsideLogEn {
@@ -137,24 +94,16 @@ func (meas Outside) LogJSON() {
 	}
 }
 
-// Since we are dropping fields we can end up with messages that are just a Source and a Timestamp
-// This allows us to drop those messages
-func (meas Outside) IsEmpty() bool {
+// IsEmpty checks if the data has any meaningful values
+func (meas *Outside) IsEmpty() bool {
 	if meas.TempF == 0.0 && meas.Pressure == 0.0 && meas.PressureInHg == 0.0 {
 		return true
 	}
 	return false
 }
 
-func (meas Outside) GetInfluxTags() map[string]string {
-	tagTmp := make(map[string]string)
-	if meas.Source != "" {
-		tagTmp["Source"] = meas.Source
-	}
-	return tagTmp
-}
-
-func (meas Outside) GetInfluxFields() map[string]interface{} {
+// GetInfluxFields returns fields for InfluxDB
+func (meas *Outside) GetInfluxFields() map[string]interface{} {
 	measTmp := make(map[string]interface{})
 	if meas.TempF != 0.0 {
 		measTmp["TempF"] = meas.TempF
@@ -162,10 +111,28 @@ func (meas Outside) GetInfluxFields() map[string]interface{} {
 	if meas.Pressure != 0.0 {
 		measTmp["Pressure"] = meas.Pressure
 	}
-
+	if meas.PressureInHg != 0.0 {
+		measTmp["PressureInHg"] = meas.PressureInHg
+	}
 	return measTmp
 }
 
-func (meas Outside) ToInfluxPoint() *write.Point {
+// ToInfluxPoint creates an InfluxDB point
+func (meas *Outside) ToInfluxPoint() *write.Point {
 	return influxdb2.NewPoint("outside", meas.GetInfluxTags(), meas.GetInfluxFields(), meas.Timestamp)
+}
+
+// GetLogEnabled returns whether logging is enabled for this data type
+func (meas *Outside) GetLogEnabled() bool {
+	return SharedSubscriptionConfig.OutsideLogEn
+}
+
+// GetMeasurementName returns the measurement name for InfluxDB
+func (meas *Outside) GetMeasurementName() string {
+	return "outside"
+}
+
+// GetTopicPrefix returns the topic prefix for MQTT publishing
+func (meas *Outside) GetTopicPrefix() string {
+	return "environment/outside"
 }

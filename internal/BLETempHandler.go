@@ -17,10 +17,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package internal
 
 import (
-	"context"
 	"encoding/json"
-	"strings"
-	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
@@ -28,58 +25,38 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// BLETemperature represents BLE temperature sensor data
 type BLETemperature struct {
-	MAC            string    `json:"MAC,omitempty"`
-	Location       string    `json:"Location,omitempty"`
-	TempF          float64   `json:"TempF,omitempty"`
-	BatteryPercent float64   `json:"BatteryPct,omitempty"`
-	Humidity       float64   `json:"Humidity,omitempty"`
-	RSSI           int64     `json:"RSSI,omitempty"`
-	Timestamp      time.Time `json:"Timestamp,omitempty"`
+	BaseSensorData
+	MAC            string  `json:"MAC,omitempty"`
+	Location       string  `json:"Location,omitempty"`
+	TempF          float64 `json:"TempF,omitempty"`
+	BatteryPercent float64 `json:"BatteryPct,omitempty"`
+	Humidity       float64 `json:"Humidity,omitempty"`
+	RSSI           int64   `json:"RSSI,omitempty"`
 }
 
+// OnBLETemperatureMessage is called when a BLE temperature message is received
 func OnBLETemperatureMessage(client MQTT.Client, message MQTT.Message) {
 	go handleBLETemperatureMessage(client, message)
 }
 
+// handleBLETemperatureMessage processes BLE temperature messages
 func handleBLETemperatureMessage(client MQTT.Client, message MQTT.Message) {
-	log.Trace().Msgf("Got a message from: %v", message.Topic())
-	if SharedSubscriptionConfig.BLELogEn {
-		log.Info().Msgf("Got a message from: %v", message.Topic())
-	}
-	bleTemp := BLETemperature{}
-	err := json.Unmarshal(message.Payload(), &bleTemp)
-	if err != nil {
-		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
-	}
+	bleTemp := &BLETemperature{}
+	HandleJSONMessage(client, message, bleTemp)
 
-	loc, ok := SharedSubscriptionConfig.MACtoLocation[strings.ToLower(bleTemp.MAC)]
-	if ok {
-		bleTemp.Location = loc
-	} else {
-		log.Warn().Msgf("Location not found for MAC %v", bleTemp.MAC)
-	}
-	if bleTemp.Timestamp.IsZero() {
-		bleTemp.Timestamp = time.Now()
-	}
-	bleTemp.LogJSON()
-	if SharedSubscriptionConfig.Repost {
-		PublishClientMessage(client, SharedSubscriptionConfig.RepostRootTopic+"ble/temperature/"+bleTemp.Location, bleTemp.ToJSON(), true)
-	}
-	if SharedSubscriptionConfig.InfluxEnabled {
-		p := bleTemp.ToInfluxPoint()
-		err := SharedInfluxWriteAPI.WritePoint(context.Background(), p)
-		if err != nil {
-			log.Warn().Msgf("Error writing to influx: %v", err.Error())
-		}
-		log.Trace().Msg("Wrote Point")
-		if SharedSubscriptionConfig.BLELogEn {
-			log.Debug().Msg("Wrote Point")
+	// Map MAC to location after unmarshalling
+	if bleTemp.MAC != "" {
+		loc := MapMACToLocation(bleTemp, bleTemp.MAC)
+		if loc != "" {
+			bleTemp.Location = loc
 		}
 	}
 }
 
-func (meas BLETemperature) ToJSON() string {
+// ToJSON serializes the data to JSON
+func (meas *BLETemperature) ToJSON() string {
 	jsonData, err := json.Marshal(meas)
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
@@ -87,7 +64,8 @@ func (meas BLETemperature) ToJSON() string {
 	return string(jsonData)
 }
 
-func (meas BLETemperature) LogJSON() {
+// LogJSON logs the JSON representation of the data
+func (meas *BLETemperature) LogJSON() {
 	json := meas.ToJSON()
 	log.Trace().Msgf("BLETemp: %v", json)
 	if SharedSubscriptionConfig.BLELogEn {
@@ -95,7 +73,14 @@ func (meas BLETemperature) LogJSON() {
 	}
 }
 
-func (meas BLETemperature) GetInfluxTags() map[string]string {
+// IsEmpty checks if the data has any meaningful values
+func (meas *BLETemperature) IsEmpty() bool {
+	// BLE temperature data is always considered valid if we received it
+	return false
+}
+
+// GetInfluxTags returns tags for InfluxDB
+func (meas *BLETemperature) GetInfluxTags() map[string]string {
 	tagTmp := make(map[string]string)
 	tagTmp["MAC"] = meas.MAC
 	if meas.Location != "" {
@@ -104,7 +89,8 @@ func (meas BLETemperature) GetInfluxTags() map[string]string {
 	return tagTmp
 }
 
-func (meas BLETemperature) GetInfluxFields() map[string]interface{} {
+// GetInfluxFields returns fields for InfluxDB
+func (meas *BLETemperature) GetInfluxFields() map[string]interface{} {
 	measTmp := make(map[string]interface{})
 	if meas.TempF != 0.0 {
 		measTmp["TempF"] = meas.TempF
@@ -121,6 +107,32 @@ func (meas BLETemperature) GetInfluxFields() map[string]interface{} {
 	return measTmp
 }
 
-func (meas BLETemperature) ToInfluxPoint() *write.Point {
+// ToInfluxPoint creates an InfluxDB point
+func (meas *BLETemperature) ToInfluxPoint() *write.Point {
 	return influxdb2.NewPoint("bleTemperature", meas.GetInfluxTags(), meas.GetInfluxFields(), meas.Timestamp)
+}
+
+// GetSource returns the source of the data
+func (meas *BLETemperature) GetSource() string {
+	return meas.MAC
+}
+
+// SetSource sets the source of the data
+func (meas *BLETemperature) SetSource(source string) {
+	meas.MAC = source
+}
+
+// GetLogEnabled returns whether logging is enabled for this data type
+func (meas *BLETemperature) GetLogEnabled() bool {
+	return SharedSubscriptionConfig.BLELogEn
+}
+
+// GetMeasurementName returns the measurement name for InfluxDB
+func (meas *BLETemperature) GetMeasurementName() string {
+	return "bleTemperature"
+}
+
+// GetTopicPrefix returns the topic prefix for MQTT publishing
+func (meas *BLETemperature) GetTopicPrefix() string {
+	return "ble/temperature"
 }

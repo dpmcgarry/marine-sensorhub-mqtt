@@ -17,10 +17,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package internal
 
 import (
-	"context"
 	"encoding/json"
 	"strings"
-	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
@@ -28,66 +26,65 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// Propulsion represents propulsion system sensor data
 type Propulsion struct {
-	Device           string    `json:"Device,omitempty"`
-	Source           string    `json:"Source,omitempty"`
-	RPM              int64     `json:"RPM,omitempty"`
-	BoostPSI         float64   `json:"BoostPSI,omitempty"`
-	OilTempF         float64   `json:"OilTempF,omitempty"`
-	OilPressure      float64   `json:"OilPressure,omitempty"`
-	CoolantTempF     float64   `json:"CoolantTempF,omitempty"`
-	RunTime          int64     `json:"RunTime,omitempty"`
-	EngineLoad       float64   `json:"EngineLoad,omitempty"`
-	EngineTorque     float64   `json:"EngineTorque,omitempty"`
-	TransOilTempF    float64   `json:"TransOilTemp,omitempty"`
-	TransOilPressure float64   `json:"TransOilPressure,omitempty"`
-	AltVoltage       float64   `json:"AlternatorVoltage,omitempty"`
-	FuelRate         float64   `json:"FuelRate,omitempty"`
-	Timestamp        time.Time `json:"Timestamp,omitempty"`
+	BaseSensorData
+	Device           string  `json:"Device,omitempty"`
+	RPM              int64   `json:"RPM,omitempty"`
+	BoostPSI         float64 `json:"BoostPSI,omitempty"`
+	OilTempF         float64 `json:"OilTempF,omitempty"`
+	OilPressure      float64 `json:"OilPressure,omitempty"`
+	CoolantTempF     float64 `json:"CoolantTempF,omitempty"`
+	RunTime          int64   `json:"RunTime,omitempty"`
+	EngineLoad       float64 `json:"EngineLoad,omitempty"`
+	EngineTorque     float64 `json:"EngineTorque,omitempty"`
+	TransOilTempF    float64 `json:"TransOilTemp,omitempty"`
+	TransOilPressure float64 `json:"TransOilPressure,omitempty"`
+	AltVoltage       float64 `json:"AlternatorVoltage,omitempty"`
+	FuelRate         float64 `json:"FuelRate,omitempty"`
 }
 
+// OnPropulsionMessage is called when a propulsion message is received
 func OnPropulsionMessage(client MQTT.Client, message MQTT.Message) {
 	go handlePropulsionMessage(client, message)
 }
 
+// handlePropulsionMessage processes propulsion messages
 func handlePropulsionMessage(client MQTT.Client, message MQTT.Message) {
 	// TODO: Support Multiple Engines
-	log.Trace().Msgf("Got a message from: %v", message.Topic())
-	if SharedSubscriptionConfig.PropLogEn {
-		log.Info().Msgf("Got a message from: %v", message.Topic())
-	}
-	measurement := message.Topic()[strings.LastIndex(message.Topic(), "/")+1:]
-	log.Trace().Msgf("Got Measurement: %v", measurement)
-	if SharedSubscriptionConfig.PropLogEn {
-		log.Info().Msgf("Got Measurement: %v", measurement)
-	}
+	prop := &Propulsion{}
+
+	// Check if this is a transmission message
 	isTranny := false
 	if strings.Contains(message.Topic(), "/transmission/") {
 		isTranny = true
 	}
-	var rawData map[string]any
-	err := json.Unmarshal(message.Payload(), &rawData)
-	if err != nil {
-		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
+
+	// Store this in a context that can be accessed by the processor
+	context := map[string]interface{}{
+		"isTranny": isTranny,
 	}
-	prop := Propulsion{}
-	var strtmp string
-	strtmp, err = ParseString(rawData["$source"])
-	if err != nil {
-		log.Warn().Msgf("Error parsing string: %v", err.Error())
-	} else {
-		prop.Source = strtmp
+
+	// Use the common handler with a custom processor that has access to the context
+	HandleSensorMessage(client, message, prop, func(rawData map[string]any, measurement string, data SensorData) {
+		processPropulsionData(rawData, measurement, data, context)
+	})
+}
+
+// processPropulsionData processes specific propulsion data fields
+func processPropulsionData(rawData map[string]any, measurement string, data SensorData, context map[string]interface{}) {
+	prop, ok := data.(*Propulsion)
+	if !ok {
+		log.Error().Msg("Failed to cast data to Propulsion type")
+		return
 	}
-	strtmp, err = ParseString(rawData["timestamp"])
-	if err != nil {
-		log.Warn().Msgf("Error parsing string: %v", err.Error())
-	} else {
-		prop.Timestamp, err = time.Parse(ISOTimeLayout, strtmp)
-		if err != nil {
-			log.Warn().Msgf("Error parsing time string: %v", err.Error())
-		}
-	}
+
+	// Get the transmission flag from context
+	isTranny, _ := context["isTranny"].(bool)
+
+	var err error
 	var floatTmp float64
+
 	switch measurement {
 	case "revolutions":
 		floatTmp, err = ParseFloat64(rawData["value"])
@@ -120,7 +117,6 @@ func handlePropulsionMessage(client MQTT.Client, message MQTT.Message) {
 			log.Warn().Msgf("Error parsing float64: %v", err.Error())
 		} else {
 			if isTranny {
-
 				prop.TransOilPressure = PascalToPSI(floatTmp)
 			} else {
 				prop.OilPressure = PascalToPSI(floatTmp)
@@ -141,8 +137,10 @@ func handlePropulsionMessage(client MQTT.Client, message MQTT.Message) {
 			prop.AltVoltage = floatTmp
 		}
 	case "transmission":
+		// Just a container topic, no data to process
 		break
 	case "fuel":
+		// Just a container topic, no data to process
 		break
 	case "rate":
 		floatTmp, err = ParseFloat64(rawData["value"])
@@ -173,38 +171,12 @@ func handlePropulsionMessage(client MQTT.Client, message MQTT.Message) {
 			prop.EngineTorque = floatTmp * 100
 		}
 	default:
-		log.Warn().Msgf("Unknown measurement %v in %v", measurement, message.Topic())
-	}
-	name, ok := SharedSubscriptionConfig.N2KtoName[strings.ToLower(prop.Source)]
-	if ok {
-		prop.Source = name
-	} else {
-		log.Warn().Msgf("Name not found for Source %v", prop.Source)
-	}
-	if prop.Timestamp.IsZero() {
-		prop.Timestamp = time.Now()
-	}
-	if !prop.IsEmpty() {
-		prop.LogJSON()
-		if SharedSubscriptionConfig.Repost {
-			PublishClientMessage(client,
-				SharedSubscriptionConfig.RepostRootTopic+"vessel/propulsion/"+prop.Source+"/"+measurement, prop.ToJSON(), true)
-		}
-		if SharedSubscriptionConfig.InfluxEnabled {
-			p := prop.ToInfluxPoint()
-			err := SharedInfluxWriteAPI.WritePoint(context.Background(), p)
-			if err != nil {
-				log.Warn().Msgf("Error writing to influx: %v", err.Error())
-			}
-			log.Trace().Msg("Wrote Point")
-			if SharedSubscriptionConfig.PropLogEn {
-				log.Debug().Msg("Wrote Point")
-			}
-		}
+		log.Warn().Msgf("Unknown measurement %v", measurement)
 	}
 }
 
-func (meas Propulsion) ToJSON() string {
+// ToJSON serializes the data to JSON
+func (meas *Propulsion) ToJSON() string {
 	jsonData, err := json.Marshal(meas)
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
@@ -212,7 +184,8 @@ func (meas Propulsion) ToJSON() string {
 	return string(jsonData)
 }
 
-func (meas Propulsion) LogJSON() {
+// LogJSON logs the JSON representation of the data
+func (meas *Propulsion) LogJSON() {
 	json := meas.ToJSON()
 	log.Trace().Msgf("Propulsion: %v", json)
 	if SharedSubscriptionConfig.PropLogEn {
@@ -220,9 +193,8 @@ func (meas Propulsion) LogJSON() {
 	}
 }
 
-// Since we are dropping fields we can end up with messages that are just a Source and a Timestamp
-// This allows us to drop those messages
-func (meas Propulsion) IsEmpty() bool {
+// IsEmpty checks if the data has any meaningful values
+func (meas *Propulsion) IsEmpty() bool {
 	if meas.RPM == 0 && meas.BoostPSI == 0.0 && meas.OilTempF == 0.0 && meas.OilPressure == 0.0 &&
 		meas.CoolantTempF == 0.0 && meas.RunTime == 0 && meas.EngineLoad == 0.0 && meas.EngineTorque == 0.0 &&
 		meas.TransOilTempF == 0.0 && meas.TransOilPressure == 0.0 && meas.AltVoltage == 0.0 && meas.FuelRate == 0.0 {
@@ -231,7 +203,8 @@ func (meas Propulsion) IsEmpty() bool {
 	return false
 }
 
-func (meas Propulsion) GetInfluxTags() map[string]string {
+// GetInfluxTags returns tags for InfluxDB
+func (meas *Propulsion) GetInfluxTags() map[string]string {
 	tagTmp := make(map[string]string)
 	if meas.Source != "" {
 		tagTmp["Source"] = meas.Source
@@ -242,7 +215,8 @@ func (meas Propulsion) GetInfluxTags() map[string]string {
 	return tagTmp
 }
 
-func (meas Propulsion) GetInfluxFields() map[string]interface{} {
+// GetInfluxFields returns fields for InfluxDB
+func (meas *Propulsion) GetInfluxFields() map[string]interface{} {
 	measTmp := make(map[string]interface{})
 	if meas.RPM != 0 {
 		measTmp["RPM"] = meas.RPM
@@ -280,10 +254,25 @@ func (meas Propulsion) GetInfluxFields() map[string]interface{} {
 	if meas.FuelRate != 0.0 {
 		measTmp["FuelRate"] = meas.FuelRate
 	}
-
 	return measTmp
 }
 
-func (meas Propulsion) ToInfluxPoint() *write.Point {
+// ToInfluxPoint creates an InfluxDB point
+func (meas *Propulsion) ToInfluxPoint() *write.Point {
 	return influxdb2.NewPoint("propulsion", meas.GetInfluxTags(), meas.GetInfluxFields(), meas.Timestamp)
+}
+
+// GetLogEnabled returns whether logging is enabled for this data type
+func (meas *Propulsion) GetLogEnabled() bool {
+	return SharedSubscriptionConfig.PropLogEn
+}
+
+// GetMeasurementName returns the measurement name for InfluxDB
+func (meas *Propulsion) GetMeasurementName() string {
+	return "propulsion"
+}
+
+// GetTopicPrefix returns the topic prefix for MQTT publishing
+func (meas *Propulsion) GetTopicPrefix() string {
+	return "propulsion"
 }
