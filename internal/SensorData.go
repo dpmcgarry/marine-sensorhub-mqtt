@@ -119,13 +119,15 @@ func ParseCommonFields(rawData map[string]any, data SensorData) {
 	if data.GetTimestamp().IsZero() {
 		data.SetTimestamp(time.Now())
 	}
-
 	// Map source name if available
 	name, ok := SharedSubscriptionConfig.N2KtoName[strings.ToLower(data.GetSource())]
 	if ok {
 		data.SetSource(name)
 	} else {
-		log.Warn().Msgf("Name not found for Source %v", data.GetSource())
+		// Skip Victron GPS data
+		if !strings.Contains(data.GetSource(), "venus.com.victronenergy.gps.") {
+			log.Warn().Msgf("Name not found for Source %v", data.GetSource())
+		}
 	}
 }
 
