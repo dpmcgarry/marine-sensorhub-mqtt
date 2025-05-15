@@ -17,10 +17,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package internal
 
 import (
-	"context"
 	"encoding/json"
 	"strings"
-	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
@@ -28,66 +26,52 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// Navigation represents navigation sensor data
 type Navigation struct {
-	Source       string    `json:"Source,omitempty"`
-	Lat          float64   `json:"Latitude,omitempty"`
-	Lon          float64   `json:"Longitude,omitempty"`
-	Alt          float64   `json:"Altitude,omitempty"`
-	SOG          float64   `json:"SpeedOverGround,omitempty"`
-	ROT          float64   `json:"RateOfTurn,omitempty"`
-	COGTrue      float64   `json:"CourseOverGroundTrue,omitempty"`
-	HeadingMag   float64   `json:"HeadingMagnetic,omitempty"`
-	MagVariation float64   `json:"MagneticVariation,omitempty"`
-	MagDeviation float64   `json:"MagneticDeviation,omitempty"`
-	Yaw          float64   `json:"Yaw,omitempty"`
-	Pitch        float64   `json:"Pitch,omitempty"`
-	Roll         float64   `json:"Roll,omitempty"`
-	HeadingTrue  float64   `json:"HeadingTrue,omitempty"`
-	STW          float64   `json:"SpeedThroughWater,omitempty"`
-	Timestamp    time.Time `json:"Timestamp,omitempty"`
+	BaseSensorData
+	Lat          float64 `json:"Latitude,omitempty"`
+	Lon          float64 `json:"Longitude,omitempty"`
+	Alt          float64 `json:"Altitude,omitempty"`
+	SOG          float64 `json:"SpeedOverGround,omitempty"`
+	ROT          float64 `json:"RateOfTurn,omitempty"`
+	COGTrue      float64 `json:"CourseOverGroundTrue,omitempty"`
+	HeadingMag   float64 `json:"HeadingMagnetic,omitempty"`
+	MagVariation float64 `json:"MagneticVariation,omitempty"`
+	MagDeviation float64 `json:"MagneticDeviation,omitempty"`
+	Yaw          float64 `json:"Yaw,omitempty"`
+	Pitch        float64 `json:"Pitch,omitempty"`
+	Roll         float64 `json:"Roll,omitempty"`
+	HeadingTrue  float64 `json:"HeadingTrue,omitempty"`
+	STW          float64 `json:"SpeedThroughWater,omitempty"`
 }
 
+// OnNavigationMessage is called when a navigation message is received
 func OnNavigationMessage(client MQTT.Client, message MQTT.Message) {
 	go handleNavigationMessage(client, message)
 }
 
+// handleNavigationMessage processes navigation messages
 func handleNavigationMessage(client MQTT.Client, message MQTT.Message) {
-	log.Trace().Msgf("Got a message from: %v", message.Topic())
-	if SharedSubscriptionConfig.NavLogEn {
-		log.Info().Msgf("Got a message from: %v", message.Topic())
-	}
-	measurement := message.Topic()[strings.LastIndex(message.Topic(), "/")+1:]
-	log.Trace().Msgf("Got Measurement: %v", measurement)
-	if SharedSubscriptionConfig.NavLogEn {
-		log.Info().Msgf("Got Measurement: %v", measurement)
-	}
-	var rawData map[string]any
-	err := json.Unmarshal(message.Payload(), &rawData)
-	if err != nil {
-		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
-	}
-	nav := Navigation{}
-	var strtmp string
-	strtmp, err = ParseString(rawData["$source"])
+	nav := &Navigation{}
+	HandleSensorMessage(client, message, nav, processNavigationData)
+}
 
-	if err != nil {
-		log.Warn().Msgf("Error parsing string: %v", err.Error())
-	} else {
-		nav.Source = strtmp
-		if strings.Contains(nav.Source, "venus.com.victronenergy.gps.") {
-			return
-		}
+// processNavigationData processes specific navigation data fields
+func processNavigationData(rawData map[string]any, measurement string, data SensorData) {
+	nav, ok := data.(*Navigation)
+	if !ok {
+		log.Error().Msg("Failed to cast data to Navigation type")
+		return
 	}
-	strtmp, err = ParseString(rawData["timestamp"])
-	if err != nil {
-		log.Warn().Msgf("Error parsing string: %v", err.Error())
-	} else {
-		nav.Timestamp, err = time.Parse(ISOTimeLayout, strtmp)
-		if err != nil {
-			log.Warn().Msgf("Error parsing time string: %v", err.Error())
-		}
+
+	// Skip Victron GPS data
+	if strings.Contains(nav.Source, "venus.com.victronenergy.gps.") {
+		return
 	}
+
+	var err error
 	var floatTmp float64
+
 	switch measurement {
 	case "headingMagnetic":
 		floatTmp, err = ParseFloat64(rawData["value"])
@@ -208,38 +192,12 @@ func handleNavigationMessage(client MQTT.Client, message MQTT.Message) {
 	case "log":
 		break
 	default:
-		log.Warn().Msgf("Unknown measurement %v in %v", measurement, message.Topic())
-	}
-	name, ok := SharedSubscriptionConfig.N2KtoName[strings.ToLower(nav.Source)]
-	if ok {
-		nav.Source = name
-	} else {
-		log.Warn().Msgf("Name not found for Source %v", nav.Source)
-	}
-	if nav.Timestamp.IsZero() {
-		nav.Timestamp = time.Now()
-	}
-	if !nav.IsEmpty() {
-		nav.LogJSON()
-		if SharedSubscriptionConfig.Repost {
-			PublishClientMessage(client,
-				SharedSubscriptionConfig.RepostRootTopic+"vessel/navigation/"+nav.Source+"/"+measurement, nav.ToJSON(), true)
-		}
-		if SharedSubscriptionConfig.InfluxEnabled {
-			p := nav.ToInfluxPoint()
-			err := SharedInfluxWriteAPI.WritePoint(context.Background(), p)
-			if err != nil {
-				log.Warn().Msgf("Error writing to influx: %v", err.Error())
-			}
-			log.Trace().Msg("Wrote Point")
-			if SharedSubscriptionConfig.NavLogEn {
-				log.Debug().Msg("Wrote Point")
-			}
-		}
+		log.Warn().Msgf("Unknown measurement %v", measurement)
 	}
 }
 
-func (meas Navigation) ToJSON() string {
+// ToJSON serializes the data to JSON
+func (meas *Navigation) ToJSON() string {
 	jsonData, err := json.Marshal(meas)
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
@@ -247,20 +205,17 @@ func (meas Navigation) ToJSON() string {
 	return string(jsonData)
 }
 
-func (meas Navigation) LogJSON() {
-	jsonData, err := json.Marshal(meas)
-	if err != nil {
-		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
-	}
-	log.Trace().Msgf("Navigation: %v", string(jsonData))
+// LogJSON logs the JSON representation of the data
+func (meas *Navigation) LogJSON() {
+	json := meas.ToJSON()
+	log.Trace().Msgf("Navigation: %v", json)
 	if SharedSubscriptionConfig.NavLogEn {
-		log.Info().Msgf("Navigation: %v", string(jsonData))
+		log.Info().Msgf("Navigation: %v", json)
 	}
 }
 
-// Since we are dropping fields we can end up with messages that are just a Source and a Timestamp
-// This allows us to drop those messages
-func (meas Navigation) IsEmpty() bool {
+// IsEmpty checks if the data has any meaningful values
+func (meas *Navigation) IsEmpty() bool {
 	if meas.Lat == 0.0 && meas.Lon == 0.0 && meas.Alt == 0.0 && meas.SOG == 0.0 && meas.ROT == 0.0 && meas.COGTrue == 0.0 &&
 		meas.HeadingMag == 0.0 && meas.MagVariation == 0.0 && meas.MagDeviation == 0.0 && meas.Yaw == 0.0 &&
 		meas.Pitch == 0.0 && meas.Roll == 0.0 && meas.HeadingTrue == 0.0 && meas.STW == 0.0 {
@@ -269,15 +224,8 @@ func (meas Navigation) IsEmpty() bool {
 	return false
 }
 
-func (meas Navigation) GetInfluxTags() map[string]string {
-	tagTmp := make(map[string]string)
-	if meas.Source != "" {
-		tagTmp["Source"] = meas.Source
-	}
-	return tagTmp
-}
-
-func (meas Navigation) GetInfluxFields() map[string]interface{} {
+// GetInfluxFields returns fields for InfluxDB
+func (meas *Navigation) GetInfluxFields() map[string]interface{} {
 	measTmp := make(map[string]interface{})
 	if meas.Lat != 0.0 {
 		measTmp["Latitude"] = meas.Lat
@@ -321,10 +269,25 @@ func (meas Navigation) GetInfluxFields() map[string]interface{} {
 	if meas.STW != 0.0 {
 		measTmp["SpeedThroughWater"] = meas.STW
 	}
-
 	return measTmp
 }
 
-func (meas Navigation) ToInfluxPoint() *write.Point {
+// ToInfluxPoint creates an InfluxDB point
+func (meas *Navigation) ToInfluxPoint() *write.Point {
 	return influxdb2.NewPoint("navigation", meas.GetInfluxTags(), meas.GetInfluxFields(), meas.Timestamp)
+}
+
+// GetLogEnabled returns whether logging is enabled for this data type
+func (meas *Navigation) GetLogEnabled() bool {
+	return SharedSubscriptionConfig.NavLogEn
+}
+
+// GetMeasurementName returns the measurement name for InfluxDB
+func (meas *Navigation) GetMeasurementName() string {
+	return "navigation"
+}
+
+// GetTopicPrefix returns the topic prefix for MQTT publishing
+func (meas *Navigation) GetTopicPrefix() string {
+	return "navigation"
 }

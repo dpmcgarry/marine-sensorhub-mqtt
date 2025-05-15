@@ -17,10 +17,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package internal
 
 import (
-	"context"
 	"encoding/json"
 	"strings"
-	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
@@ -28,51 +26,52 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// Steering represents steering sensor data
 type Steering struct {
-	Source           string    `json:"Source,omitempty"`
-	RudderAngle      float64   `json:"RudderAngle,omitempty"`
-	AutopilotState   string    `json:"AutoPilotState,omitempty"`
-	TargetHeadingMag float64   `json:"TargetHeading,omitempty"`
-	Timestamp        time.Time `json:"Timestamp,omitempty"`
+	BaseSensorData
+	RudderAngle      float64 `json:"RudderAngle,omitempty"`
+	AutopilotState   string  `json:"AutoPilotState,omitempty"`
+	TargetHeadingMag float64 `json:"TargetHeading,omitempty"`
 }
 
+// OnSteeringMessage is called when a steering message is received
 func OnSteeringMessage(client MQTT.Client, message MQTT.Message) {
 	go handleSteeringMessage(client, message)
 }
 
+// handleSteeringMessage processes steering messages
 func handleSteeringMessage(client MQTT.Client, message MQTT.Message) {
-	log.Trace().Msgf("Got a message from: %v", message.Topic())
-	if SharedSubscriptionConfig.SteerLogEn {
-		log.Info().Msgf("Got a message from: %v", message.Topic())
-	}
+	steer := &Steering{}
 	measurement := message.Topic()[strings.LastIndex(message.Topic(), "/")+1:]
-	log.Trace().Msgf("Got Measurement: %v", measurement)
-	if SharedSubscriptionConfig.SteerLogEn {
-		log.Info().Msgf("Got Measurement: %v", measurement)
+
+	// Store the original measurement for potential modification later
+	originalMeasurement := measurement
+
+	// Use the common handler
+	HandleSensorMessage(client, message, steer, func(rawData map[string]any, measurement string, data SensorData) {
+		processSteeringData(rawData, measurement, data)
+	})
+
+	// Special case for state measurement - rename to autopilotState for reposting
+	if SharedSubscriptionConfig.Repost && !steer.IsEmpty() && originalMeasurement == "state" {
+		PublishClientMessage(client,
+			SharedSubscriptionConfig.RepostRootTopic+"vessel/steering/"+steer.Source+"/autopilotState",
+			steer.ToJSON(), true)
 	}
-	var rawData map[string]any
-	err := json.Unmarshal(message.Payload(), &rawData)
-	if err != nil {
-		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
+}
+
+// processSteeringData processes specific steering data fields
+func processSteeringData(rawData map[string]any, measurement string, data SensorData) {
+	steer, ok := data.(*Steering)
+	if !ok {
+		log.Error().Msg("Failed to cast data to Steering type")
+		return
 	}
-	steer := Steering{}
-	var strtmp string
-	strtmp, err = ParseString(rawData["$source"])
-	if err != nil {
-		log.Warn().Msgf("Error parsing string: %v", err.Error())
-	} else {
-		steer.Source = strtmp
-	}
-	strtmp, err = ParseString(rawData["timestamp"])
-	if err != nil {
-		log.Warn().Msgf("Error parsing string: %v", err.Error())
-	} else {
-		steer.Timestamp, err = time.Parse(ISOTimeLayout, strtmp)
-		if err != nil {
-			log.Warn().Msgf("Error parsing time string: %v", err.Error())
-		}
-	}
+
+	var err error
 	var floatTmp float64
+	var strtmp string
+
 	switch measurement {
 	case "rudderAngle":
 		floatTmp, err = ParseFloat64(rawData["value"])
@@ -82,15 +81,17 @@ func handleSteeringMessage(client MQTT.Client, message MQTT.Message) {
 			steer.RudderAngle = RadiansToDegrees(floatTmp)
 		}
 	case "autopilot":
+		// Just a container topic, no data to process
 		break
 	case "state":
 		strtmp, err = ParseString(rawData["value"])
 		if err != nil {
-			log.Warn().Msgf("Error parsing float64: %v", err.Error())
+			log.Warn().Msgf("Error parsing string: %v", err.Error())
 		} else {
 			steer.AutopilotState = strtmp
 		}
 	case "target":
+		// Just a container topic, no data to process
 		break
 	case "headingMagnetic":
 		floatTmp, err = ParseFloat64(rawData["value"])
@@ -100,41 +101,12 @@ func handleSteeringMessage(client MQTT.Client, message MQTT.Message) {
 			steer.TargetHeadingMag = RadiansToDegrees(floatTmp)
 		}
 	default:
-		log.Warn().Msgf("Unknown measurement %v in %v", measurement, message.Topic())
-	}
-	name, ok := SharedSubscriptionConfig.N2KtoName[strings.ToLower(steer.Source)]
-	if ok {
-		steer.Source = name
-	} else {
-		log.Warn().Msgf("Name not found for Source %v", steer.Source)
-	}
-	if steer.Timestamp.IsZero() {
-		steer.Timestamp = time.Now()
-	}
-	if !steer.IsEmpty() {
-		steer.LogJSON()
-		if SharedSubscriptionConfig.Repost {
-			if measurement == "state" {
-				measurement = "autopilotState"
-			}
-			PublishClientMessage(client,
-				SharedSubscriptionConfig.RepostRootTopic+"vessel/steering/"+steer.Source+"/"+measurement, steer.ToJSON(), true)
-		}
-		if SharedSubscriptionConfig.InfluxEnabled {
-			p := steer.ToInfluxPoint()
-			err := SharedInfluxWriteAPI.WritePoint(context.Background(), p)
-			if err != nil {
-				log.Warn().Msgf("Error writing to influx: %v", err.Error())
-			}
-			log.Trace().Msg("Wrote Point")
-			if SharedSubscriptionConfig.SteerLogEn {
-				log.Debug().Msg("Wrote Point")
-			}
-		}
+		log.Warn().Msgf("Unknown measurement %v", measurement)
 	}
 }
 
-func (meas Steering) ToJSON() string {
+// ToJSON serializes the data to JSON
+func (meas *Steering) ToJSON() string {
 	jsonData, err := json.Marshal(meas)
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
@@ -142,7 +114,8 @@ func (meas Steering) ToJSON() string {
 	return string(jsonData)
 }
 
-func (meas Steering) LogJSON() {
+// LogJSON logs the JSON representation of the data
+func (meas *Steering) LogJSON() {
 	json := meas.ToJSON()
 	log.Trace().Msgf("Steering: %v", json)
 	if SharedSubscriptionConfig.SteerLogEn {
@@ -150,24 +123,16 @@ func (meas Steering) LogJSON() {
 	}
 }
 
-// Since we are dropping fields we can end up with messages that are just a Source and a Timestamp
-// This allows us to drop those messages
-func (meas Steering) IsEmpty() bool {
+// IsEmpty checks if the data has any meaningful values
+func (meas *Steering) IsEmpty() bool {
 	if meas.RudderAngle == 0.0 && meas.AutopilotState == "" && meas.TargetHeadingMag == 0.0 {
 		return true
 	}
 	return false
 }
 
-func (meas Steering) GetInfluxTags() map[string]string {
-	tagTmp := make(map[string]string)
-	if meas.Source != "" {
-		tagTmp["Source"] = meas.Source
-	}
-	return tagTmp
-}
-
-func (meas Steering) GetInfluxFields() map[string]interface{} {
+// GetInfluxFields returns fields for InfluxDB
+func (meas *Steering) GetInfluxFields() map[string]interface{} {
 	measTmp := make(map[string]interface{})
 	if meas.RudderAngle != 0.0 {
 		measTmp["RudderAngle"] = meas.RudderAngle
@@ -178,10 +143,25 @@ func (meas Steering) GetInfluxFields() map[string]interface{} {
 	if meas.TargetHeadingMag != 0.0 {
 		measTmp["TargetHeading"] = meas.TargetHeadingMag
 	}
-
 	return measTmp
 }
 
-func (meas Steering) ToInfluxPoint() *write.Point {
+// ToInfluxPoint creates an InfluxDB point
+func (meas *Steering) ToInfluxPoint() *write.Point {
 	return influxdb2.NewPoint("steering", meas.GetInfluxTags(), meas.GetInfluxFields(), meas.Timestamp)
+}
+
+// GetLogEnabled returns whether logging is enabled for this data type
+func (meas *Steering) GetLogEnabled() bool {
+	return SharedSubscriptionConfig.SteerLogEn
+}
+
+// GetMeasurementName returns the measurement name for InfluxDB
+func (meas *Steering) GetMeasurementName() string {
+	return "steering"
+}
+
+// GetTopicPrefix returns the topic prefix for MQTT publishing
+func (meas *Steering) GetTopicPrefix() string {
+	return "steering"
 }

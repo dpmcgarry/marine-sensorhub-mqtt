@@ -17,10 +17,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package internal
 
 import (
-	"context"
 	"encoding/json"
-	"strings"
-	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
@@ -28,50 +25,35 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// Water represents water sensor data
 type Water struct {
-	Source                 string    `json:"Source,omitempty"`
-	TempF                  float64   `json:"TempF,omitempty"`
-	DepthUnderTransducerFt float64   `json:"DepthUnderTransducerFt,omitempty"`
-	Timestamp              time.Time `json:"Timestamp,omitempty"`
+	BaseSensorData
+	TempF                  float64 `json:"TempF,omitempty"`
+	DepthUnderTransducerFt float64 `json:"DepthUnderTransducerFt,omitempty"`
 }
 
+// OnWaterMessage is called when a water message is received
 func OnWaterMessage(client MQTT.Client, message MQTT.Message) {
 	go handleWaterMessage(client, message)
 }
 
+// handleWaterMessage processes water messages
 func handleWaterMessage(client MQTT.Client, message MQTT.Message) {
-	log.Trace().Msgf("Got a message from: %v", message.Topic())
-	if SharedSubscriptionConfig.WaterLogEn {
-		log.Info().Msgf("Got a message from: %v", message.Topic())
+	water := &Water{}
+	HandleSensorMessage(client, message, water, processWaterData)
+}
+
+// processWaterData processes specific water data fields
+func processWaterData(rawData map[string]any, measurement string, data SensorData) {
+	water, ok := data.(*Water)
+	if !ok {
+		log.Error().Msg("Failed to cast data to Water type")
+		return
 	}
-	measurement := message.Topic()[strings.LastIndex(message.Topic(), "/")+1:]
-	log.Trace().Msgf("Got Measurement: %v", measurement)
-	if SharedSubscriptionConfig.WaterLogEn {
-		log.Info().Msgf("Got Measurement: %v", measurement)
-	}
-	var rawData map[string]any
-	err := json.Unmarshal(message.Payload(), &rawData)
-	if err != nil {
-		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
-	}
-	water := Water{}
-	var strtmp string
-	strtmp, err = ParseString(rawData["$source"])
-	if err != nil {
-		log.Warn().Msgf("Error parsing string: %v", err.Error())
-	} else {
-		water.Source = strtmp
-	}
-	strtmp, err = ParseString(rawData["timestamp"])
-	if err != nil {
-		log.Warn().Msgf("Error parsing string: %v", err.Error())
-	} else {
-		water.Timestamp, err = time.Parse(ISOTimeLayout, strtmp)
-		if err != nil {
-			log.Warn().Msgf("Error parsing time string: %v", err.Error())
-		}
-	}
+
+	var err error
 	var floatTmp float64
+
 	switch measurement {
 	case "temperature":
 		floatTmp, err = ParseFloat64(rawData["value"])
@@ -90,38 +72,12 @@ func handleWaterMessage(client MQTT.Client, message MQTT.Message) {
 			water.DepthUnderTransducerFt = MetersToFeet(floatTmp)
 		}
 	default:
-		log.Warn().Msgf("Unknown measurement %v in %v", measurement, message.Topic())
-	}
-	name, ok := SharedSubscriptionConfig.N2KtoName[strings.ToLower(water.Source)]
-	if ok {
-		water.Source = name
-	} else {
-		log.Warn().Msgf("Name not found for Source %v", water.Source)
-	}
-	if water.Timestamp.IsZero() {
-		water.Timestamp = time.Now()
-	}
-	if !water.IsEmpty() {
-		water.LogJSON()
-		if SharedSubscriptionConfig.Repost {
-			PublishClientMessage(client,
-				SharedSubscriptionConfig.RepostRootTopic+"vessel/environment/water/"+water.Source+"/"+measurement, water.ToJSON(), true)
-		}
-		if SharedSubscriptionConfig.InfluxEnabled {
-			p := water.ToInfluxPoint()
-			err := SharedInfluxWriteAPI.WritePoint(context.Background(), p)
-			if err != nil {
-				log.Warn().Msgf("Error writing to influx: %v", err.Error())
-			}
-			log.Trace().Msg("Wrote Point")
-			if SharedSubscriptionConfig.WaterLogEn {
-				log.Debug().Msg("Wrote Point")
-			}
-		}
+		log.Warn().Msgf("Unknown measurement %v", measurement)
 	}
 }
 
-func (meas Water) ToJSON() string {
+// ToJSON serializes the data to JSON
+func (meas *Water) ToJSON() string {
 	jsonData, err := json.Marshal(meas)
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
@@ -129,7 +85,8 @@ func (meas Water) ToJSON() string {
 	return string(jsonData)
 }
 
-func (meas Water) LogJSON() {
+// LogJSON logs the JSON representation of the data
+func (meas *Water) LogJSON() {
 	json := meas.ToJSON()
 	log.Trace().Msgf("Water: %v", json)
 	if SharedSubscriptionConfig.WaterLogEn {
@@ -137,24 +94,16 @@ func (meas Water) LogJSON() {
 	}
 }
 
-// Since we are dropping fields we can end up with messages that are just a Source and a Timestamp
-// This allows us to drop those messages
-func (meas Water) IsEmpty() bool {
+// IsEmpty checks if the data has any meaningful values
+func (meas *Water) IsEmpty() bool {
 	if meas.DepthUnderTransducerFt == 0.0 && meas.TempF == 0.0 {
 		return true
 	}
 	return false
 }
 
-func (meas Water) GetInfluxTags() map[string]string {
-	tagTmp := make(map[string]string)
-	if meas.Source != "" {
-		tagTmp["Source"] = meas.Source
-	}
-	return tagTmp
-}
-
-func (meas Water) GetInfluxFields() map[string]interface{} {
+// GetInfluxFields returns fields for InfluxDB
+func (meas *Water) GetInfluxFields() map[string]interface{} {
 	measTmp := make(map[string]interface{})
 	if meas.TempF != 0.0 {
 		measTmp["TempF"] = meas.TempF
@@ -162,10 +111,25 @@ func (meas Water) GetInfluxFields() map[string]interface{} {
 	if meas.DepthUnderTransducerFt != 0.0 {
 		measTmp["DepthUnderTransducerFt"] = meas.DepthUnderTransducerFt
 	}
-
 	return measTmp
 }
 
-func (meas Water) ToInfluxPoint() *write.Point {
+// ToInfluxPoint creates an InfluxDB point
+func (meas *Water) ToInfluxPoint() *write.Point {
 	return influxdb2.NewPoint("water", meas.GetInfluxTags(), meas.GetInfluxFields(), meas.Timestamp)
+}
+
+// GetLogEnabled returns whether logging is enabled for this data type
+func (meas *Water) GetLogEnabled() bool {
+	return SharedSubscriptionConfig.WaterLogEn
+}
+
+// GetMeasurementName returns the measurement name for InfluxDB
+func (meas *Water) GetMeasurementName() string {
+	return "water"
+}
+
+// GetTopicPrefix returns the topic prefix for MQTT publishing
+func (meas *Water) GetTopicPrefix() string {
+	return "environment/water"
 }

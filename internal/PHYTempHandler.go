@@ -17,10 +17,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package internal
 
 import (
-	"context"
 	"encoding/json"
-	"strings"
-	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
@@ -28,56 +25,39 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// PHYTemperature represents physical temperature sensor data
 type PHYTemperature struct {
-	MAC       string    `json:"MAC,omitempty"`
-	Location  string    `json:"Location,omitempty"`
-	Device    string    `json:"Device,omitempty"`
-	Component string    `json:"Component,omitempty"`
-	TempF     float64   `json:"TempF,omitempty"`
-	Timestamp time.Time `json:"Timestamp,omitempty"`
+	BaseSensorData
+	MAC       string  `json:"MAC,omitempty"`
+	Location  string  `json:"Location,omitempty"`
+	Device    string  `json:"Device,omitempty"`
+	Component string  `json:"Component,omitempty"`
+	TempF     float64 `json:"TempF,omitempty"`
 }
 
+// OnPHYTemperatureMessage is called when a physical temperature message is received
 func OnPHYTemperatureMessage(client MQTT.Client, message MQTT.Message) {
 	go handlePHYTemperatureMessage(client, message)
 }
 
+// handlePHYTemperatureMessage processes physical temperature messages
 func handlePHYTemperatureMessage(client MQTT.Client, message MQTT.Message) {
-	log.Trace().Msgf("Got a message from: %v", message.Topic())
-	if SharedSubscriptionConfig.PHYLogEn {
-		log.Info().Msgf("Got a message from: %v", message.Topic())
-	}
-	phyTemp := PHYTemperature{}
-	err := json.Unmarshal(message.Payload(), &phyTemp)
-	if err != nil {
-		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
-	}
-	loc, ok := SharedSubscriptionConfig.MACtoLocation[strings.ToLower(phyTemp.MAC)]
-	if ok {
-		phyTemp.Location = loc
-	} else {
-		log.Warn().Msgf("Location not found for MAC %v", phyTemp.MAC)
-	}
-	if phyTemp.Timestamp.IsZero() {
-		phyTemp.Timestamp = time.Now()
-	}
-	phyTemp.LogJSON()
-	if SharedSubscriptionConfig.Repost {
-		PublishClientMessage(client, SharedSubscriptionConfig.RepostRootTopic+"rtd/temperature/"+phyTemp.Location, phyTemp.ToJSON(), true)
-	}
-	if SharedSubscriptionConfig.InfluxEnabled {
-		p := phyTemp.ToInfluxPoint()
-		err := SharedInfluxWriteAPI.WritePoint(context.Background(), p)
-		if err != nil {
-			log.Warn().Msgf("Error writing to influx: %v", err.Error())
-		}
-		log.Trace().Msg("Wrote Point")
-		if SharedSubscriptionConfig.PHYLogEn {
-			log.Debug().Msg("Wrote Point")
+	phyTemp := &PHYTemperature{}
+	HandleJSONMessage(client, message, phyTemp)
+
+	// Map MAC to location after unmarshalling
+	if phyTemp.MAC != "" {
+		loc := MapMACToLocation(phyTemp, phyTemp.MAC)
+		if loc != "" {
+			phyTemp.Location = loc
 		}
 	}
+
+	SendJSONMessage(client, message, phyTemp)
 }
 
-func (meas PHYTemperature) ToJSON() string {
+// ToJSON serializes the data to JSON
+func (meas *PHYTemperature) ToJSON() string {
 	jsonData, err := json.Marshal(meas)
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
@@ -85,7 +65,8 @@ func (meas PHYTemperature) ToJSON() string {
 	return string(jsonData)
 }
 
-func (meas PHYTemperature) LogJSON() {
+// LogJSON logs the JSON representation of the data
+func (meas *PHYTemperature) LogJSON() {
 	json := meas.ToJSON()
 	log.Trace().Msgf("Physical Temp: %v", json)
 	if SharedSubscriptionConfig.PHYLogEn {
@@ -93,7 +74,13 @@ func (meas PHYTemperature) LogJSON() {
 	}
 }
 
-func (meas PHYTemperature) GetInfluxTags() map[string]string {
+// IsEmpty checks if the data has any meaningful values
+func (meas *PHYTemperature) IsEmpty() bool {
+	return meas.TempF == 0.0
+}
+
+// GetInfluxTags returns tags for InfluxDB
+func (meas *PHYTemperature) GetInfluxTags() map[string]string {
 	tagTmp := make(map[string]string)
 	tagTmp["MAC"] = meas.MAC
 	if meas.Location != "" {
@@ -108,7 +95,8 @@ func (meas PHYTemperature) GetInfluxTags() map[string]string {
 	return tagTmp
 }
 
-func (meas PHYTemperature) GetInfluxFields() map[string]interface{} {
+// GetInfluxFields returns fields for InfluxDB
+func (meas *PHYTemperature) GetInfluxFields() map[string]interface{} {
 	measTmp := make(map[string]interface{})
 	if meas.TempF != 0.0 {
 		measTmp["TempF"] = meas.TempF
@@ -116,6 +104,32 @@ func (meas PHYTemperature) GetInfluxFields() map[string]interface{} {
 	return measTmp
 }
 
-func (meas PHYTemperature) ToInfluxPoint() *write.Point {
+// ToInfluxPoint creates an InfluxDB point
+func (meas *PHYTemperature) ToInfluxPoint() *write.Point {
 	return influxdb2.NewPoint("phyTemperature", meas.GetInfluxTags(), meas.GetInfluxFields(), meas.Timestamp)
+}
+
+// GetSource returns the source of the data
+func (meas *PHYTemperature) GetSource() string {
+	return meas.MAC
+}
+
+// SetSource sets the source of the data
+func (meas *PHYTemperature) SetSource(source string) {
+	meas.MAC = source
+}
+
+// GetLogEnabled returns whether logging is enabled for this data type
+func (meas *PHYTemperature) GetLogEnabled() bool {
+	return SharedSubscriptionConfig.PHYLogEn
+}
+
+// GetMeasurementName returns the measurement name for InfluxDB
+func (meas *PHYTemperature) GetMeasurementName() string {
+	return "phyTemperature"
+}
+
+// GetTopicPrefix returns the topic prefix for MQTT publishing
+func (meas *PHYTemperature) GetTopicPrefix() string {
+	return "rtd/temperature"
 }

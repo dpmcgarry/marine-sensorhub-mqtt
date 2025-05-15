@@ -17,10 +17,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package internal
 
 import (
-	"context"
 	"encoding/json"
-	"strings"
-	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
@@ -28,55 +25,40 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// GNSS represents GNSS sensor data
 type GNSS struct {
-	Source        string    `json:"Source,omitempty"`
-	AntennaAlt    float64   `json:"AntennaAlt,omitempty"`
-	Satellites    int64     `json:"Satellites,omitempty"`
-	HozDilution   float64   `json:"HozDilution,omitempty"`
-	PosDilution   float64   `json:"PosDilution,omitempty"`
-	GeoidalSep    float64   `json:"GeoidalSep,omitempty"`
-	Type          string    `json:"Type,omitempty"`
-	MethodQuality string    `json:"MethodQuality,omitempty"`
-	Timestamp     time.Time `json:"Timestamp,omitempty"`
+	BaseSensorData
+	AntennaAlt    float64 `json:"AntennaAlt,omitempty"`
+	Satellites    int64   `json:"Satellites,omitempty"`
+	HozDilution   float64 `json:"HozDilution,omitempty"`
+	PosDilution   float64 `json:"PosDilution,omitempty"`
+	GeoidalSep    float64 `json:"GeoidalSep,omitempty"`
+	Type          string  `json:"Type,omitempty"`
+	MethodQuality string  `json:"MethodQuality,omitempty"`
 }
 
+// OnGNSSMessage is called when a GNSS message is received
 func OnGNSSMessage(client MQTT.Client, message MQTT.Message) {
 	go handleGNSSMessage(client, message)
 }
 
+// handleGNSSMessage processes GNSS messages
 func handleGNSSMessage(client MQTT.Client, message MQTT.Message) {
-	log.Trace().Msgf("Got a message from: %v", message.Topic())
-	if SharedSubscriptionConfig.GNSSLogEn {
-		log.Info().Msgf("Got a message from: %v", message.Topic())
+	gnss := &GNSS{}
+	HandleSensorMessage(client, message, gnss, processGNSSData)
+}
+
+// processGNSSData processes specific GNSS data fields
+func processGNSSData(rawData map[string]any, measurement string, data SensorData) {
+	gnss, ok := data.(*GNSS)
+	if !ok {
+		log.Error().Msg("Failed to cast data to GNSS type")
+		return
 	}
-	measurement := message.Topic()[strings.LastIndex(message.Topic(), "/")+1:]
-	log.Trace().Msgf("Got Measurement: %v", measurement)
-	if SharedSubscriptionConfig.GNSSLogEn {
-		log.Info().Msgf("Got Measurement: %v", measurement)
-	}
-	var rawData map[string]any
-	err := json.Unmarshal(message.Payload(), &rawData)
-	if err != nil {
-		log.Warn().Msgf("Error unmarshalling JSON for topic: %v error: %v", message.Topic(), err.Error())
-	}
-	gnss := GNSS{}
-	var strtmp string
-	strtmp, err = ParseString(rawData["$source"])
-	if err != nil {
-		log.Warn().Msgf("Error parsing string: %v", err.Error())
-	} else {
-		gnss.Source = strtmp
-	}
-	strtmp, err = ParseString(rawData["timestamp"])
-	if err != nil {
-		log.Warn().Msgf("Error parsing string: %v", err.Error())
-	} else {
-		gnss.Timestamp, err = time.Parse(ISOTimeLayout, strtmp)
-		if err != nil {
-			log.Warn().Msgf("Error parsing time string: %v", err.Error())
-		}
-	}
+
+	var err error
 	var floatTmp float64
+	var strtmp string
 
 	switch measurement {
 	case "antennaAltitude":
@@ -107,7 +89,6 @@ func handleGNSSMessage(client MQTT.Client, message MQTT.Message) {
 		} else {
 			gnss.PosDilution = floatTmp
 		}
-
 	case "geoidalSeparation":
 		floatTmp, err = ParseFloat64(rawData["value"])
 		if err != nil {
@@ -134,38 +115,12 @@ func handleGNSSMessage(client MQTT.Client, message MQTT.Message) {
 	case "satellitesInView":
 		break
 	default:
-		log.Warn().Msgf("Unknown measurement %v in %v", measurement, message.Topic())
-	}
-	name, ok := SharedSubscriptionConfig.N2KtoName[strings.ToLower(gnss.Source)]
-	if ok {
-		gnss.Source = name
-	} else {
-		log.Warn().Msgf("Name not found for Source %v", gnss.Source)
-	}
-	if gnss.Timestamp.IsZero() {
-		gnss.Timestamp = time.Now()
-	}
-	if !gnss.IsEmpty() {
-		gnss.LogJSON()
-		if SharedSubscriptionConfig.Repost {
-			PublishClientMessage(client,
-				SharedSubscriptionConfig.RepostRootTopic+"vessel/gnss/"+gnss.Source+"/"+measurement, gnss.ToJSON(), true)
-		}
-		if SharedSubscriptionConfig.InfluxEnabled {
-			p := gnss.ToInfluxPoint()
-			err := SharedInfluxWriteAPI.WritePoint(context.Background(), p)
-			if err != nil {
-				log.Warn().Msgf("Error writing to influx: %v", err.Error())
-			}
-			log.Trace().Msg("Wrote Point")
-			if SharedSubscriptionConfig.GNSSLogEn {
-				log.Debug().Msg("Wrote Point")
-			}
-		}
+		log.Warn().Msgf("Unknown measurement %v", measurement)
 	}
 }
 
-func (meas GNSS) ToJSON() string {
+// ToJSON serializes the data to JSON
+func (meas *GNSS) ToJSON() string {
 	jsonData, err := json.Marshal(meas)
 	if err != nil {
 		log.Warn().Msgf("Error Serializing JSON: %v", err.Error())
@@ -173,7 +128,8 @@ func (meas GNSS) ToJSON() string {
 	return string(jsonData)
 }
 
-func (meas GNSS) LogJSON() {
+// LogJSON logs the JSON representation of the data
+func (meas *GNSS) LogJSON() {
 	json := meas.ToJSON()
 	log.Trace().Msgf("GNSS: %v", json)
 	if SharedSubscriptionConfig.GNSSLogEn {
@@ -181,9 +137,8 @@ func (meas GNSS) LogJSON() {
 	}
 }
 
-// Since we are dropping fields we can end up with messages that are just a Source and a Timestamp
-// This allows us to drop those messages
-func (meas GNSS) IsEmpty() bool {
+// IsEmpty checks if the data has any meaningful values
+func (meas *GNSS) IsEmpty() bool {
 	if meas.AntennaAlt == 0.0 && meas.Satellites == 0 && meas.HozDilution == 0.0 && meas.PosDilution == 0.0 &&
 		meas.GeoidalSep == 0.0 && meas.Type == "" && meas.MethodQuality == "" {
 		return true
@@ -191,20 +146,13 @@ func (meas GNSS) IsEmpty() bool {
 	return false
 }
 
-func (meas GNSS) GetInfluxTags() map[string]string {
-	tagTmp := make(map[string]string)
-	if meas.Source != "" {
-		tagTmp["Source"] = meas.Source
-	}
-	return tagTmp
-}
-
-func (meas GNSS) GetInfluxFields() map[string]interface{} {
+// GetInfluxFields returns fields for InfluxDB
+func (meas *GNSS) GetInfluxFields() map[string]interface{} {
 	measTmp := make(map[string]interface{})
 	if meas.AntennaAlt != 0.0 {
 		measTmp["AntennaAlt"] = meas.AntennaAlt
 	}
-	if meas.Satellites != 0.0 {
+	if meas.Satellites != 0 {
 		measTmp["Satellites"] = meas.Satellites
 	}
 	if meas.HozDilution != 0.0 {
@@ -222,10 +170,25 @@ func (meas GNSS) GetInfluxFields() map[string]interface{} {
 	if meas.MethodQuality != "" {
 		measTmp["MethodQuality"] = meas.MethodQuality
 	}
-
 	return measTmp
 }
 
-func (meas GNSS) ToInfluxPoint() *write.Point {
+// ToInfluxPoint creates an InfluxDB point
+func (meas *GNSS) ToInfluxPoint() *write.Point {
 	return influxdb2.NewPoint("gnss", meas.GetInfluxTags(), meas.GetInfluxFields(), meas.Timestamp)
+}
+
+// GetLogEnabled returns whether logging is enabled for this data type
+func (meas *GNSS) GetLogEnabled() bool {
+	return SharedSubscriptionConfig.GNSSLogEn
+}
+
+// GetMeasurementName returns the measurement name for InfluxDB
+func (meas *GNSS) GetMeasurementName() string {
+	return "gnss"
+}
+
+// GetTopicPrefix returns the topic prefix for MQTT publishing
+func (meas *GNSS) GetTopicPrefix() string {
+	return "gnss"
 }
